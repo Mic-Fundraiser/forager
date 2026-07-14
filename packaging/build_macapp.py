@@ -329,6 +329,20 @@ def write_plist(contents: Path, version: str) -> None:
 # 7. Firma + DMG
 # ----------------------------------------------------------------------------
 def sign_app() -> None:
+    """Firma il bundle. FORAGER_SIGN_IDENTITY (nome o SHA-1 di un'identità nel
+    keychain) attiva la firma reale con hardened runtime + timestamp — pronta
+    per un'eventuale notarizzazione. Vuota → firma ad-hoc."""
+    identity = os.getenv("FORAGER_SIGN_IDENTITY", "").strip()
+    if identity:
+        log(f"Firma del bundle con identità «{identity}» …")
+        try:
+            run(["codesign", "--force", "--deep", "--options", "runtime",
+                 "--timestamp", "--sign", identity, str(APP_BUNDLE)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            ok("App firmata (identità sviluppatore, hardened runtime)")
+            return
+        except subprocess.CalledProcessError:
+            warn("Firma con identità fallita: ripiego sulla firma ad-hoc.")
     log("Firma ad-hoc del bundle …")
     try:
         run(["codesign", "--force", "--deep", "--sign", "-", str(APP_BUNDLE)],
