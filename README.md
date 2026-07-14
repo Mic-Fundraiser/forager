@@ -1,8 +1,8 @@
 # Forager
 
-**CRM open source per major donor e corporate fundraising**, pensato per organizzazioni
-nonprofit, partiti, comitati referendari, fondazioni. Tutto in locale, niente cloud, niente abbonamenti
-(eccetto Claude Code, vedi [Costi](#costi)).
+**Il CRM open source per major donor, aziende e fondazioni.** Non un CRM generico:
+è costruito per chi fa major donor, corporate e foundation fundraising. Tutto in locale,
+niente cloud, niente abbonamenti (eccetto il motore AI, vedi [Costi](#costi)).
 
 Inserisci un nome → Claude esegue ricerca web pubblica, sintetizza un profilo strutturato (capacity, propensity, board, giving history, network), popola il CRM con fonti verificabili, suggerisce next-best-action allineata alle tue cause e ai tuoi tier ask. E poi ti accompagna nel ciclo completo: cadenze di ricontatto, registro donazioni reali, campagne, ringraziamenti, forecast.
 
