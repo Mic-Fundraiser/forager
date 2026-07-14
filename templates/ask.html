@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block title %}Chiedi ai dati · Forager{% endblock %}
+{% block content %}
+
+<div class="max-w-3xl mx-auto">
+  <div class="mb-6">
+    <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('ask.workspace') }}</div>
+    <h1 class="text-[28px] font-bold tracking-tight">{{ tr('ask.title') }}</h1>
+    <p class="text-[13.5px] text-ink-500 mt-1">{{ tr('ask.subtitle_pre') }} ({{ total }} {{ tr('ask.prospect') }}) {{ tr('ask.subtitle_post') }}</p>
+  </div>
+
+  <div class="bg-white border border-line rounded-2xl overflow-hidden">
+    <div class="p-5 border-b border-line bg-ink-50">
+      <form onsubmit="ask(event)" class="flex items-end gap-2">
+        <textarea id="q" rows="1" placeholder="{{ tr('ask.input_ph') }}"
+                  class="!py-3 !text-[14px] !bg-white resize-none leading-snug" style="max-height:160px" required></textarea>
+        <button id="stopBtn" type="button" onclick="stopAsk()" class="btn-ghost shrink-0" style="display:none" title="{{ tr('ask.stop') }}"><i data-lucide="square" class="w-4 h-4"></i></button>
+        <button id="askBtn" type="submit" class="btn-primary shrink-0"><i data-lucide="sparkles" class="w-4 h-4"></i> {{ tr('ask.ask') }}</button>
+      </form>
+      <div class="flex flex-wrap gap-1.5 mt-3">
+        {% for ex in [
+          tr('ask.example_1'),
+          tr('ask.example_2'),
+          tr('ask.example_3'),
+          tr('ask.example_4'),
+          tr('ask.example_5')
+        ] %}
+        <button type="button" class="suggest-chip" onclick="askThis(this.textContent)">{{ ex }}</button>
+        {% endfor %}
+      </div>
+    </div>
+    <div id="out" class="px-6 py-6 min-h-[180px]">
+      <div id="hint" class="text-[13px] text-ink-400 text-center py-8">{{ tr('ask.hint') }}</div>
+    </div>
+  </div>
+</div>
+
+<style>
+.suggest-chip { background:#fff; border:1px solid var(--line); border-radius:999px; padding:5px 11px; font-size:12px; color:var(--ink-600); cursor:pointer; }
+.suggest-chip:hover { border-color:var(--ink-900); color:var(--ink-900); }
+.ask-out { font-size:14px; line-height:1.65; color:#18181b; }
+.ask-out p { margin:0 0 10px; } .ask-out p:last-child { margin:0; }
+.ask-out ul,.ask-out ol { margin:6px 0 10px; padding-left:22px; } .ask-out li { margin-bottom:4px; }
+.ask-out h2,.ask-out h3,.ask-out h4 { font-weight:700; margin:14px 0 6px; font-size:15px; }
+.ask-out a { color:#18181b; text-decoration:underline; text-underline-offset:2px; font-weight:600; }
+.ask-out table { border-collapse:collapse; margin:8px 0; font-size:13px; } .ask-out th,.ask-out td { border:1px solid var(--line); padding:5px 9px; text-align:left; }
+.ask-out strong { font-weight:700; }
+.ask-out .cursor { display:inline-block; width:2px; height:1em; background:currentColor; margin-left:1px; animation:blink 1s steps(2) infinite; vertical-align:text-bottom; opacity:.7; }
+@keyframes blink { 50% { opacity:0; } }
+.typing { display:inline-flex; gap:4px; } .typing span { width:6px; height:6px; border-radius:999px; background:var(--ink-400); animation:typing 1.2s infinite; }
+.typing span:nth-child(2){animation-delay:.15s} .typing span:nth-child(3){animation-delay:.3s}
+@keyframes typing { 0%,60%,100%{opacity:.25;transform:translateY(0)} 30%{opacity:1;transform:translateY(-3px)} }
+</style>
+
+<script>
+const $ = id => document.getElementById(id);
+const qEl = $('q');
+let ctrl = null;
+qEl.addEventListener('input', () => { qEl.style.height='auto'; qEl.style.height=Math.min(qEl.scrollHeight,160)+'px'; });
+qEl.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); ask(e); } });
+
+function escapeHtml(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function md(t){
+  if(!t) return '';
+  let s = escapeHtml(t);
+  s = s.replace(/```([\s\S]*?)```/g,(_,c)=>`<pre>${c.trim()}</pre>`);
+  s = s.replace(/`([^`\n]+)`/g,'<code>$1</code>');
+  s = s.replace(/\*\*([^*\n]+?)\*\*/g,'<strong>$1</strong>');
+  s = s.replace(/^### (.+)$/gm,'<h4>$1</h4>').replace(/^## (.+)$/gm,'<h3>$1</h3>');
+  // tabelle markdown semplici
+  s = s.replace(/(?:^\|.+\|\s*\n)(?:^\|[-:\s|]+\|\s*\n)((?:^\|.+\|\s*\n?)*)/gm, m => {
+    const rows = m.trim().split('\n').filter(r=>r.trim().startsWith('|'));
+    if(rows.length<2) return m;
+    const cells = r => r.replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+    let html='<table><thead><tr>'+cells(rows[0]).map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+    for(let i=2;i<rows.length;i++) html+='<tr>'+cells(rows[i]).map(c=>`<td>${c}</td>`).join('')+'</tr>';
+    return html+'</tbody></table>';
+  });
+  s = s.replace(/(?:^[-*] .+(?:\n|$))+/gm, m => '<ul>'+m.trim().split('\n').map(l=>`<li>${l.replace(/^[-*] /,'')}</li>`).join('')+'</ul>');
+  s = s.replace(/\[([^\]]+)\]\((\/[^\)]+|https?:\/\/[^\)]+)\)/g,'<a href="$2">$1</a>');
+  return s.split(/\n{2,}/).map(b=>{b=b.trim(); if(!b) return ''; return /^<(h\d|ul|ol|pre|table)/.test(b)?b:'<p>'+b.replace(/\n/g,'<br>')+'</p>';}).join('\n');
+}
+
+function askThis(t){ qEl.value=t; ask(); }
+function stopAsk(){ if(ctrl) ctrl.abort(); }
+
+async function ask(e){
+  if(e&&e.preventDefault) e.preventDefault();
+  if(ctrl) return;
+  const q = qEl.value.trim(); if(!q) return;
+  $('hint')?.remove();
+  const out = $('out');
+  out.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  $('askBtn').disabled = true; $('stopBtn').style.display='inline-flex';
+  ctrl = new AbortController();
+  let full='', shown='', queue='', done=false, timer=null, first=true;
+  function paint(streaming){ out.innerHTML = '<div class="ask-out">'+(streaming?escapeHtml(shown)+'<span class="cursor"></span>':md(shown))+'</div>'; }
+  function step(){
+    if(queue.length===0){ if(done){ paint(false); timer=null; return; } timer=setTimeout(step,40); return; }
+    const take = queue.length>400?12:queue.length>120?5:queue.length>40?2:1;
+    if(first){ out.innerHTML=''; first=false; }
+    shown += queue.slice(0,take); queue=queue.slice(take); paint(true);
+    timer=setTimeout(step, queue.length>400?4:queue.length>120?8:queue.length>40?14:22);
+  }
+  try {
+    const r = await fetch('/api/ask/stream', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({question:q}), signal:ctrl.signal });
+    if(!r.ok || !r.body) throw new Error('{{ tr("ask.err_no_response") }}');
+    const reader=r.body.getReader(), dec=new TextDecoder(); let buf='';
+    while(true){ const {value,done:d}=await reader.read(); if(d) break;
+      buf+=dec.decode(value,{stream:true}); let i;
+      while((i=buf.indexOf('\n\n'))>=0){ const block=buf.slice(0,i); buf=buf.slice(i+2);
+        if(!block.startsWith('data: ')) continue;
+        let evt; try{ evt=JSON.parse(block.slice(6)); }catch{ continue; }
+        if(evt.type==='chunk'){ full+=evt.text; queue+=evt.text; if(!timer) step(); }
+        else if(evt.type==='done'){ const f=evt.text||full; if(f.length>full.length){ queue+=f.slice(full.length); full=f; } done=true; }
+        else if(evt.type==='error'){ out.innerHTML='<div style="color:#9f1239;font-size:13.5px">⚠ '+escapeHtml(evt.error)+'</div>'; done=true; }
+      }
+    }
+    done=true; if(!timer) step();
+  } catch(err){
+    if(err.name!=='AbortError') out.innerHTML='<div style="color:#9f1239;font-size:13.5px">⚠ '+escapeHtml(err.message)+'</div>';
+    else { done=true; paint(false); }
+  } finally { ctrl=null; $('askBtn').disabled=false; $('stopBtn').style.display='none'; }
+}
+</script>
+{% endblock %}

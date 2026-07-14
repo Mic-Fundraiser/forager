@@ -1,0 +1,435 @@
+{% extends 'base.html' %}
+{% block title %}AI Compose · {{ p.full_name }}{% endblock %}
+{% block content %}
+
+<div class="text-[12px] font-medium text-ink-400 mb-3">
+  <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="hover:text-ink-700">{{ p.full_name }}</a>
+  <span class="text-ink-300 mx-1">/</span>
+  <span class="text-ink-700">{{ tr('compose.breadcrumb') }}</span>
+</div>
+
+<div class="flex items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-[26px] font-bold tracking-tight">{{ tr('compose.title') }}</h1>
+    <p class="text-[13.5px] text-ink-500 mt-1">{{ tr('compose.subtitle') }}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+
+  <div class="space-y-4">
+
+    <!-- PARAMETRI -->
+    <details class="bg-white border border-line rounded-2xl overflow-hidden" id="params" open>
+      <summary class="cursor-pointer px-6 py-4 flex items-center gap-2 list-none select-none">
+        <i data-lucide="settings-2" class="w-4 h-4 text-ink-700"></i>
+        <span class="text-[14px] font-semibold">{{ tr('compose.params') }}</span>
+        <span class="text-[11px] text-ink-500 ml-2" id="paramsSummary"></span>
+        <i data-lucide="chevron-down" class="w-4 h-4 ml-auto text-ink-400 transition-transform"></i>
+      </summary>
+      <div class="px-6 pb-6 pt-2 border-t border-line space-y-4">
+        <div>
+          <label class="label">{{ tr('compose.purpose') }} <span class="req">*</span></label>
+          <select id="purpose">
+            <option value="cold_intro">{{ tr('compose.purpose_cold_intro') }}</option>
+            <option value="warm_followup">{{ tr('compose.purpose_warm_followup') }}</option>
+            <option value="ask">{{ tr('compose.purpose_ask') }}</option>
+            <option value="thank_you">{{ tr('compose.purpose_thank_you') }}</option>
+            <option value="event_invite">{{ tr('compose.purpose_event_invite') }}</option>
+            <option value="reactivation">{{ tr('compose.purpose_reactivation') }}</option>
+            <option value="introduction_request">{{ tr('compose.purpose_introduction_request') }}</option>
+            <option value="briefing_meeting">{{ tr('compose.purpose_briefing_meeting') }}</option>
+            <option value="custom">{{ tr('compose.purpose_custom') }}</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="label">{{ tr('compose.tone') }}</label>
+            <select id="tone">
+              <option value="warm">{{ tr('compose.tone_warm') }}</option>
+              <option value="formal">{{ tr('compose.tone_formal') }}</option>
+              <option value="direct">{{ tr('compose.tone_direct') }}</option>
+              <option value="confidential">{{ tr('compose.tone_confidential') }}</option>
+              <option value="visionary">{{ tr('compose.tone_visionary') }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="label">{{ tr('compose.word_target') }}</label>
+            <input id="word_target" type="number" value="180" min="60" max="500">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="label">{{ tr('compose.recipient') }}</label>
+            <input id="contact_name" value="{{ p.full_name }}">
+          </div>
+          <div>
+            <label class="label">{{ tr('compose.recipient_email') }}</label>
+            <input id="contact_email" value="{{ p.email or '' }}" placeholder="{{ tr('compose.optional') }}">
+          </div>
+        </div>
+        {% if contacts %}
+        <div>
+          <label class="label">{{ tr('compose.hunter_contacts') }}</label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {% for c in contacts %}
+            <button type="button" onclick="document.getElementById('contact_name').value='{{ c.full_name or (c.first_name+' '+c.last_name) }}'; document.getElementById('contact_email').value='{{ c.email }}'"
+                    class="text-left flex items-center gap-2 p-2.5 border border-line rounded-lg hover:border-ink-900 hover:bg-ink-50 transition">
+              <div class="w-7 h-7 rounded-full bg-ink-100 grid place-items-center text-ink-600 shrink-0"><i data-lucide="user" class="w-3.5 h-3.5"></i></div>
+              <div class="min-w-0">
+                <div class="font-semibold text-[12.5px] truncate">{{ c.full_name or ((c.first_name or '') + ' ' + (c.last_name or '')) }}</div>
+                <div class="text-[11px] text-ink-500 font-mono truncate">{{ c.email }}</div>
+              </div>
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        <div>
+          <label class="label">
+            {{ tr('compose.style_example') }}
+            <a href="{{ url_for('email_templates') }}" target="_blank" class="text-[11px] text-ink-500 hover:text-ink-900 ml-2">{{ tr('compose.manage_examples') }}</a>
+          </label>
+          <select id="template_id">
+            <option value="">{{ tr('compose.no_template') }}</option>
+            {% if email_templates %}
+              {% set cur_cat = '' %}
+              {% for t in email_templates %}
+                {% if t.category != cur_cat %}
+                  {% if cur_cat %}</optgroup>{% endif %}
+                  <optgroup label="{{ t.category or 'custom' }}">
+                  {% set cur_cat = t.category %}
+                {% endif %}
+                <option value="{{ t.id }}">{{ t.name }}{% if t.description %} — {{ t.description[:60] }}{% endif %}</option>
+              {% endfor %}
+              </optgroup>
+            {% endif %}
+          </select>
+          <p class="help">{{ tr('compose.style_help') }}</p>
+        </div>
+        <div>
+          <label class="label">{{ tr('compose.key_points') }}</label>
+          <textarea id="key_points" rows="3" placeholder="{{ tr('compose.key_points_ph') }}"></textarea>
+        </div>
+      </div>
+    </details>
+
+    <!-- CHAT-LIKE OUTPUT -->
+    <div class="bg-white border border-line rounded-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-line flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-ink-900 grid place-items-center"><i data-lucide="sparkles" class="w-4 h-4 text-white"></i></div>
+        <div class="flex-1">
+          <div class="text-[14px] font-semibold">{{ tr('compose.claude_writing_for') }} {{ p.full_name }}</div>
+          <div class="text-[11px] text-ink-500" id="status">{{ tr('compose.status_waiting') }}</div>
+        </div>
+        <button id="btnRegen" class="btn-ghost btn-sm" onclick="generate()" style="display:none">
+          <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> {{ tr('compose.regenerate') }}
+        </button>
+      </div>
+
+      <div id="output" class="px-6 py-5 min-h-[200px]">
+        <div class="text-[13px] text-ink-400 text-center py-8" id="emptyHint">
+          {{ tr('compose.empty_hint_pre') }} <strong>{{ tr('compose.generate') }}</strong>.<br>{{ tr('compose.empty_hint_post') }}
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-line bg-ink-50 flex flex-wrap items-center gap-2">
+        <button id="btnGenerate" type="button" class="btn-primary" onclick="generate()">
+          <i data-lucide="sparkles" class="w-4 h-4"></i> {{ tr('compose.generate') }}
+        </button>
+        <button id="btnRegenBottom" type="button" class="btn-primary" onclick="generate()" style="display:none">
+          <i data-lucide="rotate-cw" class="w-4 h-4"></i> {{ tr('compose.regenerate') }}
+        </button>
+        <button id="btnStop" type="button" class="btn-ghost btn-sm" onclick="stopGen()" style="display:none">
+          <i data-lucide="square" class="w-3.5 h-3.5"></i> {{ tr('compose.stop') }}
+        </button>
+        <button id="btnCopy" type="button" class="btn-ghost btn-sm" onclick="copyText()" style="display:none">
+          <i data-lucide="clipboard-copy" class="w-3.5 h-3.5"></i> {{ tr('compose.copy_text') }}
+        </button>
+        <a id="lnkOpenDraft" class="btn-ghost btn-sm" style="display:none" href="#">
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i> {{ tr('compose.open_saved_draft') }}
+        </a>
+        <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="btn-ghost btn-sm ml-auto">← {{ tr('compose.back_to_prospect') }}</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="space-y-4">
+    <div class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[13px] font-semibold mb-3 flex items-center gap-2"><i data-lucide="user" class="w-4 h-4 text-ink-700"></i> {{ tr('compose.prospect') }}</h3>
+      <div class="flex items-center gap-3 mb-3">
+        <img class="av" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}">
+        <div class="min-w-0">
+          <div class="font-semibold text-[13px]">{{ p.full_name }}</div>
+          <div class="text-[12px] text-ink-500 truncate">{{ p.role or '' }}{% if p.role and p.company %} · {% endif %}{{ p.company or '' }}</div>
+        </div>
+      </div>
+      {% if p.ai_summary %}<p class="text-[12.5px] text-ink-600 leading-relaxed">{{ p.ai_summary[:280] }}{% if p.ai_summary|length > 280 %}…{% endif %}</p>{% endif %}
+    </div>
+
+    {% if org_ctx and org_ctx.name %}
+    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+      <div class="flex items-center gap-2 text-emerald-800 text-[12px] font-semibold mb-2">
+        <i data-lucide="check-circle-2" class="w-4 h-4"></i> {{ tr('compose.briefing_active') }}
+      </div>
+      <div class="text-[12.5px] text-emerald-900">{{ org_ctx.name }}</div>
+      {% if org_ctx.cause_areas %}<div class="text-[11.5px] text-emerald-800 mt-1">{{ tr('compose.causes') }} {{ org_ctx.cause_areas[:80] }}{% if org_ctx.cause_areas|length > 80 %}…{% endif %}</div>{% endif %}
+    </div>
+    {% else %}
+    <a href="{{ url_for('organization') }}" class="block bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100/60 transition">
+      <div class="text-amber-900 text-[12.5px] font-semibold">⚠ {{ tr('compose.briefing_missing') }}</div>
+      <p class="text-[11.5px] text-amber-800 mt-1">{{ tr('compose.briefing_missing_desc') }} <strong>{{ tr('compose.configure_now') }} →</strong></p>
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.compose-out { font-size: 14px; line-height: 1.65; color: #18181b; }
+.compose-out .subject-block {
+  background: #fafafa; border: 1px solid #e4e4e7; border-radius: 10px;
+  padding: 12px 16px; margin-bottom: 16px;
+}
+.compose-out .subject-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #71717a; margin-bottom: 4px; }
+.compose-out .subject-text { font-size: 15px; font-weight: 600; color: #18181b; }
+.compose-out .body-block { white-space: pre-wrap; }
+.compose-out .cursor { display: inline-block; width: 7px; height: 16px; background: #18181b; margin-left: 2px; animation: blink 1s infinite; vertical-align: middle; opacity: .6; }
+@keyframes blink { 0%, 50% { opacity: .6; } 51%, 100% { opacity: 0; } }
+.typing { display: inline-flex; gap: 4px; padding: 8px 0; }
+.typing span { width: 7px; height: 7px; border-radius: 999px; background: #a1a1aa; animation: typing 1.2s infinite; }
+.typing span:nth-child(2) { animation-delay: .15s; }
+.typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes typing { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+</style>
+
+<script>
+const PROSPECT_ID = {{ p.id }};
+const $ = (id) => document.getElementById(id);
+let currentReader = null;
+let lastRaw = '';        // totale ricevuto dal server
+let typedRaw = '';       // quello effettivamente "scritto" sullo schermo
+let typeQueue = '';      // da scrivere
+let typingTimer = null;
+let streamDone = false;
+
+function getParams() {
+  return {
+    purpose: $('purpose').value,
+    tone: $('tone').value,
+    word_target: parseInt($('word_target').value || '180', 10),
+    contact_name: $('contact_name').value,
+    contact_email: $('contact_email').value,
+    key_points: $('key_points').value,
+    template_id: $('template_id') ? $('template_id').value || null : null,
+  };
+}
+
+function paramsSummary() {
+  const p = getParams();
+  const label = $('purpose').selectedOptions[0].text;
+  $('paramsSummary').textContent = `${label} · ${p.tone} · ${p.word_target} {{ tr('compose.words') }}`;
+}
+document.addEventListener('change', paramsSummary);
+paramsSummary();
+
+function escapeHtml(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderProgress(raw) {
+  // parse: prima riga "Oggetto: X", poi corpo
+  const idx = raw.indexOf('\n');
+  let subject = '', body = '';
+  const first = idx >= 0 ? raw.slice(0, idx) : raw;
+  const rest = idx >= 0 ? raw.slice(idx + 1).replace(/^\n+/, '') : '';
+  if (/^oggetto:|^subject:/i.test(first.trim())) {
+    subject = first.split(':').slice(1).join(':').trim();
+    body = rest;
+  } else {
+    body = raw;
+  }
+  return { subject, body };
+}
+
+function paintBubble(raw, streaming) {
+  const out = $('output');
+  $('emptyHint')?.remove();
+  const { subject, body } = renderProgress(raw);
+  out.innerHTML = `
+    <div class="compose-out">
+      ${subject ? `<div class="subject-block"><div class="subject-label">{{ tr('compose.subject') }}</div><div class="subject-text">${escapeHtml(subject)}</div></div>` : ''}
+      <div class="body-block">${escapeHtml(body)}${streaming ? '<span class="cursor"></span>' : ''}</div>
+    </div>`;
+}
+
+async function showFinishedState() {
+  // dopo la generazione: nascondi "Genera", mostra "Rigenera"/"Copia" e salva in background
+  $('btnGenerate').style.display = 'none';
+  $('btnRegenBottom').style.display = 'inline-flex';
+  $('btnRegen').style.display = 'inline-flex';
+  $('btnCopy').style.display = 'inline-flex';
+  await autoSave();
+}
+
+async function copyText() {
+  const raw = (lastRaw || typedRaw || '').trim();
+  if (!raw) return;
+  const { subject, body } = renderProgress(raw);
+  const txt = (subject ? '{{ tr("compose.subject_prefix") }}' + subject + '\n\n' : '') + body;
+  try {
+    await navigator.clipboard.writeText(txt);
+    const b = $('btnCopy');
+    const prev = b.innerHTML;
+    b.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> {{ tr("compose.copied") }}';
+    lucide.createIcons();
+    setTimeout(() => { b.innerHTML = prev; lucide.createIcons(); }, 1800);
+  } catch (_) {
+    $('status').textContent = '{{ tr("compose.copy_failed") }}';
+  }
+}
+
+async function autoSave() {
+  const text = (lastRaw || typedRaw || '').trim();
+  if (!text) return;
+  $('status').textContent = '{{ tr("compose.saving") }}';
+  try {
+    const body = { text, ...getParams() };
+    const r = await fetch('/api/compose/' + PROSPECT_ID + '/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      $('status').innerHTML = '✓ {{ tr("compose.draft_saved") }} · <a href="' + data.url + '" class="underline">{{ tr("compose.open") }}</a>';
+      const lnk = $('lnkOpenDraft');
+      lnk.href = data.url;
+      lnk.style.display = 'inline-flex';
+      lucide.createIcons();
+    } else {
+      $('status').textContent = '{{ tr("compose.save_error") }} ' + (data.error || '');
+    }
+  } catch (e) {
+    console.error('Auto-save error:', e);
+    $('status').textContent = '{{ tr("compose.save_error") }} ' + e.message;
+  }
+}
+
+function typewriterStep() {
+  if (typeQueue.length === 0) {
+    if (streamDone) {
+      // finito: stato finale
+      paintBubble(typedRaw, false);
+      typingTimer = null;
+      $('status').textContent = '{{ tr("compose.status_ready") }}';
+      showFinishedState();
+      return;
+    }
+    typingTimer = setTimeout(typewriterStep, 40);
+    return;
+  }
+  // burst: scrivi più caratteri se la coda è grande (per drenare velocemente i blob giganti)
+  const take = typeQueue.length > 400 ? 12
+             : typeQueue.length > 120 ? 5
+             : typeQueue.length > 40  ? 2
+             : 1;
+  typedRaw += typeQueue.slice(0, take);
+  typeQueue = typeQueue.slice(take);
+  paintBubble(typedRaw, true);
+  // velocità adattiva
+  const delay = typeQueue.length > 400 ? 4
+              : typeQueue.length > 120 ? 8
+              : typeQueue.length > 40  ? 14
+              : 22;
+  typingTimer = setTimeout(typewriterStep, delay);
+}
+
+async function generate() {
+  lastRaw = ''; typedRaw = ''; typeQueue = ''; streamDone = false;
+  if (typingTimer) { clearTimeout(typingTimer); typingTimer = null; }
+  paramsSummary();
+  // entra in stato "in generazione": nascondi rigen e link bozza, mostra generate disabled + stop
+  $('btnGenerate').style.display = 'inline-flex';
+  $('btnGenerate').disabled = true;
+  $('btnRegenBottom').style.display = 'none';
+  $('btnRegen').style.display = 'none';
+  $('lnkOpenDraft').style.display = 'none';
+  $('btnStop').style.display = 'inline-flex';
+  $('emptyHint')?.remove();
+  $('output').innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  $('status').textContent = '{{ tr("compose.status_generating") }}';
+  $('params').open = false;
+
+  const ctrl = new AbortController();
+  currentReader = ctrl;
+  try {
+    const r = await fetch('/api/compose/' + PROSPECT_ID + '/stream', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(getParams()),
+      signal: ctrl.signal,
+    });
+    if (!r.ok || !r.body) throw new Error('{{ tr("compose.err_no_response_pre") }}' + r.status + '{{ tr("compose.err_no_response_post") }}');
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const block = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        if (!block.startsWith('data: ')) continue;
+        let evt;
+        try { evt = JSON.parse(block.slice(6)); } catch { continue; }
+        if (evt.type === 'chunk') {
+          lastRaw += evt.text;
+          typeQueue += evt.text;
+          if (!typingTimer) typewriterStep();
+        } else if (evt.type === 'done') {
+          // assicura che tutto il testo finale sia in coda (in caso di drift)
+          const full = evt.text || lastRaw;
+          if (full.length > lastRaw.length) {
+            typeQueue += full.slice(lastRaw.length);
+            lastRaw = full;
+          }
+          streamDone = true;
+        } else if (evt.type === 'error') {
+          $('output').innerHTML = '<div style="color:#9f1239;font-size:13.5px">⚠ ' + escapeHtml(evt.error) + '</div>';
+          $('status').textContent = '{{ tr("compose.error") }}';
+          streamDone = true;
+        }
+      }
+    }
+    // forza chiusura
+    streamDone = true;
+    if (!typingTimer) typewriterStep();
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      $('output').innerHTML = '<div style="color:#9f1239;font-size:13.5px">⚠ ' + escapeHtml(e.message) + '</div>';
+      $('status').textContent = '{{ tr("compose.error_prefix") }} ' + e.message;
+      console.error('Compose stream error:', e);
+    } else {
+      $('status').textContent = '{{ tr("compose.status_interrupted") }}';
+      typeQueue = '';
+      paintBubble(typedRaw, false);
+    }
+    streamDone = true;
+  } finally {
+    currentReader = null;
+    $('btnGenerate').disabled = false;
+    $('btnStop').style.display = 'none';
+    // fallback: se per qualche motivo il typewriter non si è riavviato, mostra comunque i bottoni finali
+    if (lastRaw.trim()) {
+      showFinishedState();
+    }
+  }
+}
+
+function stopGen() {
+  if (currentReader) currentReader.abort();
+}
+
+</script>
+
+{% endblock %}

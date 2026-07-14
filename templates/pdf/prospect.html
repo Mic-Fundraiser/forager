@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Prospect Brief · {{ p.full_name }}</title>
+<style>
+  @import url('{{ url_for('static', filename='vendor/fonts/fonts.css') }}');
+
+  @page {
+    size: A4;
+    margin: 18mm 16mm 22mm 16mm;
+    @bottom-left {
+      content: "Forager · Prospect Research";
+      font-family: 'Inter', sans-serif;
+      font-size: 8.5pt;
+      color: #a1a1aa;
+    }
+    @bottom-center {
+      content: "{{ p.full_name|replace('"', "'") }} · {{ tr('pdf.page_generated') }} {{ now.strftime('%d.%m.%Y') }}";
+      font-family: 'Inter', sans-serif;
+      font-size: 8.5pt;
+      color: #a1a1aa;
+    }
+    @bottom-right {
+      content: "{{ tr('pdf.page_abbr') }} " counter(page) " / " counter(pages);
+      font-family: 'Inter', sans-serif;
+      font-size: 8.5pt;
+      color: #a1a1aa;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    font-size: 10pt;
+    line-height: 1.5;
+    color: #18181b;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* === FRONTMATTER === */
+  .eyebrow {
+    font-size: 8.5pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #71717a;
+    margin-bottom: 4mm;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #18181b;
+    padding-bottom: 3mm;
+  }
+  .eyebrow .brand { color: #18181b; }
+
+  /* === HEADER PROSPECT === */
+  .hero {
+    display: flex;
+    gap: 7mm;
+    margin-bottom: 6mm;
+  }
+  .hero-img {
+    width: 28mm;
+    height: 28mm;
+    border-radius: 5mm;
+    background: #f4f4f5;
+    border: 1px solid #e4e4e7;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .hero-main { flex: 1; min-width: 0; }
+  .hero-tags { margin-bottom: 2.5mm; }
+  .hero h1 {
+    margin: 0 0 1.5mm;
+    font-size: 22pt;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+  }
+  .hero .headline {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-style: italic;
+    font-size: 12pt;
+    color: #3f3f46;
+    margin: 0 0 3mm;
+    line-height: 1.35;
+  }
+  .hero-meta {
+    font-size: 9pt;
+    color: #52525b;
+    margin-top: 2mm;
+  }
+  .hero-meta span { margin-right: 4mm; white-space: nowrap; }
+
+  /* === SCORES STRIP === */
+  .scores {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2mm;
+    margin: 4mm 0 7mm;
+    padding: 3mm 0;
+    border-top: 1px solid #e4e4e7;
+    border-bottom: 1px solid #e4e4e7;
+  }
+  .score {
+    text-align: center;
+    padding: 1mm 2mm;
+    border-right: 1px solid #f4f4f5;
+  }
+  .score:last-child { border-right: none; }
+  .score .label {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    color: #71717a;
+    margin-bottom: 1mm;
+  }
+  .score .value {
+    font-size: 18pt;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .score .unit { font-size: 9pt; color: #a1a1aa; font-weight: 500; }
+  .stars-row { letter-spacing: 1.5px; color: #d97706; font-size: 13pt; line-height: 1; }
+  .stars-row .off { color: #e4e4e7; }
+
+  /* === BADGES === */
+  .b {
+    display: inline-block;
+    padding: 1mm 2.5mm;
+    border-radius: 999px;
+    font-size: 7.5pt;
+    font-weight: 600;
+    border: 1px solid;
+    margin-right: 1.5mm;
+    margin-bottom: 1mm;
+    line-height: 1.4;
+  }
+  .b-slate   { background:#f4f4f5; color:#52525b; border-color:#e4e4e7; }
+  .b-indigo  { background:#eef2ff; color:#4338ca; border-color:#c7d2fe; }
+  .b-cyan    { background:#ecfeff; color:#0e7490; border-color:#a5f3fc; }
+  .b-violet  { background:#f0fdfa; color:#0f766e; border-color:#99f6e4; }
+  .b-amber   { background:#fffbeb; color:#b45309; border-color:#fde68a; }
+  .b-emerald { background:#ecfdf5; color:#047857; border-color:#a7f3d0; }
+  .b-rose    { background:#fff1f2; color:#9f1239; border-color:#fecdd3; }
+  .b-blue    { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+
+  /* === SECTION === */
+  .section {
+    margin: 7mm 0 5mm;
+    page-break-inside: avoid;
+  }
+  .section-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #18181b;
+    border-bottom: 2px solid #18181b;
+    padding-bottom: 1.5mm;
+    margin-bottom: 3mm;
+  }
+  .section-title .count { color: #a1a1aa; font-weight: 500; letter-spacing: 0.04em; }
+  .section-body { font-size: 10pt; line-height: 1.6; color: #27272a; }
+
+  /* AI summary card */
+  .card {
+    background: #fafafa;
+    border: 1px solid #e4e4e7;
+    border-radius: 3mm;
+    padding: 4mm 5mm;
+    margin-bottom: 3mm;
+    page-break-inside: avoid;
+  }
+  .card.flag { background: #fff1f2; border-color: #fecdd3; }
+  .card.next { background: #f5f3ff; border-color: #ddd6fe; }
+  .card .h {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    font-weight: 700;
+    color: #71717a;
+    margin-bottom: 1.5mm;
+  }
+  .card.flag .h { color: #9f1239; }
+  .card.next .h { color: #6d28d9; }
+
+  /* === TABLE === */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    page-break-inside: auto;
+  }
+  table thead { display: table-header-group; }
+  table tr { page-break-inside: avoid; }
+  th, td {
+    padding: 2.5mm 3mm;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid #f4f4f5;
+  }
+  th {
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #71717a;
+    background: #fafafa;
+    border-bottom: 1px solid #e4e4e7;
+    border-top: 1px solid #e4e4e7;
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+
+  /* === KEY VALUE === */
+  .kv {
+    display: grid;
+    grid-template-columns: 36mm 1fr;
+    gap: 1mm 4mm;
+    font-size: 9.5pt;
+  }
+  .kv dt {
+    color: #71717a;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 7.5pt;
+    letter-spacing: 0.08em;
+    padding-top: 1.2mm;
+  }
+  .kv dd { margin: 0; color: #18181b; }
+  .kv dd a { color: #18181b; text-decoration: none; border-bottom: 1px dotted #a1a1aa; }
+
+  /* === SOURCES === */
+  .src-item {
+    page-break-inside: avoid;
+    padding: 2mm 0;
+    border-bottom: 1px dashed #e4e4e7;
+    font-size: 9pt;
+  }
+  .src-item:last-child { border-bottom: none; }
+  .src-num {
+    display: inline-block;
+    width: 7mm;
+    font-variant-numeric: tabular-nums;
+    color: #a1a1aa;
+    font-weight: 600;
+  }
+  .src-link { color: #18181b; text-decoration: none; font-weight: 600; }
+  .src-link.broken { color: #9f1239; text-decoration: line-through; }
+  .src-meta { font-size: 8pt; color: #71717a; margin-top: 0.8mm; padding-left: 7mm; word-break: break-all; }
+  .src-snippet { font-size: 8.5pt; color: #52525b; margin-top: 0.8mm; padding-left: 7mm; line-height: 1.4; }
+  .src-ok { color: #047857; font-weight: 700; }
+  .src-ko { color: #9f1239; font-weight: 700; }
+
+  .news-item {
+    page-break-inside: avoid;
+    padding: 2.5mm 0;
+    border-bottom: 1px dashed #e4e4e7;
+  }
+  .news-item:last-child { border-bottom: none; }
+  .news-title { font-weight: 600; font-size: 10pt; color: #18181b; }
+  .news-meta { font-size: 8pt; color: #71717a; margin-top: 0.5mm; }
+  .news-snippet { font-size: 9pt; color: #52525b; margin-top: 1mm; line-height: 1.45; }
+
+  /* page breaks */
+  .page-break { page-break-after: always; }
+  .avoid-break { page-break-inside: avoid; }
+
+  .empty {
+    font-size: 9pt;
+    color: #a1a1aa;
+    font-style: italic;
+    padding: 2mm 0;
+  }
+
+  /* No-print bar (visible only when shown in browser, not in WeasyPrint print) */
+  .toolbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: #18181b;
+    color: white;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 9999;
+    font-size: 13px;
+  }
+  .toolbar button, .toolbar a {
+    background: white;
+    color: #18181b;
+    padding: 7px 14px;
+    border-radius: 7px;
+    border: none;
+    font-weight: 600;
+    font-size: 12.5px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .toolbar button:hover, .toolbar a:hover { background: #f4f4f5; }
+  .toolbar a.ghost { background: transparent; color: white; border: 1px solid rgba(255,255,255,.3); }
+  .toolbar a.ghost:hover { background: rgba(255,255,255,.1); }
+  .toolbar .spacer { flex: 1; }
+  .doc-wrap { padding-top: 64px; max-width: 210mm; margin: 0 auto; }
+
+  @media print {
+    .toolbar { display: none; }
+    .doc-wrap { padding-top: 0; }
+  }
+</style>
+</head>
+<body>
+
+{% if browser_print %}
+<div class="toolbar no-print">
+  <strong>{{ tr('pdf.preview_title') }}</strong>
+  <span style="opacity:.7">{{ tr('pdf.preview_hint') }}</span>
+  <div class="spacer"></div>
+  <button onclick="window.print()">🖨 {{ tr('pdf.print_save') }}</button>
+  <a href="javascript:window.close()" class="ghost">{{ tr('pdf.close') }}</a>
+</div>
+{% endif %}
+
+<div class="doc-wrap">
+
+<div class="eyebrow">
+  <span class="brand">FORAGER · PROSPECT BRIEF</span>
+  <span>{{ now.strftime('%d %B %Y') }}</span>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <img class="hero-img" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}" alt="">
+  <div class="hero-main">
+    <div class="hero-tags">
+      <span class="b b-{{ TYPE_BADGE.get(p.type,'slate') }}">{{ TYPE_LABELS.get(p.type, p.type) }}</span>
+      <span class="b b-{% if p.stage=='identified' %}slate{% elif p.stage=='qualified' %}blue{% elif p.stage=='cultivated' %}teal{% elif p.stage=='solicited' %}amber{% elif p.stage=='stewarded' %}emerald{% else %}rose{% endif %}">{{ STAGE_LABELS.get(p.stage, p.stage) }}</span>
+      <span class="b b-{% if p.priority=='high' %}rose{% elif p.priority=='medium' %}indigo{% else %}slate{% endif %}">{{ tr('pdf.priority') }} {{ PRIORITY_LABELS[p.priority] }}</span>
+      {% if prospect_tags %}{% for t in prospect_tags %}<span class="b b-{{ t.color or 'slate' }}">{{ t.name }}</span>{% endfor %}{% endif %}
+    </div>
+    <h1>{{ p.full_name }}</h1>
+    {% if p.headline %}<p class="headline">{{ p.headline }}</p>{% endif %}
+    <div class="hero-meta">
+      {% if p.role %}<span><strong>{{ tr('pdf.role') }}:</strong> {{ p.role }}</span>{% endif %}
+      {% if p.company %}<span><strong>{{ tr('pdf.company') }}:</strong> {{ p.company }}</span>{% endif %}
+      {% if p.location %}<span><strong>{{ tr('pdf.location') }}:</strong> {{ p.location }}</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- SCORES -->
+<div class="scores">
+  <div class="score">
+    <div class="label">Propensity</div>
+    <div class="value">{{ p.propensity_score or 0 }}<span class="unit">/100</span></div>
+  </div>
+  <div class="score">
+    <div class="label">Affinity</div>
+    <div class="value">{{ p.affinity_score or 0 }}<span class="unit">/100</span></div>
+  </div>
+  <div class="score">
+    <div class="label">Capacity</div>
+    <div class="stars-row">{% for i in range(5) %}{% if i<(p.capacity_rating or 0) %}★{% else %}<span class="off">★</span>{% endif %}{% endfor %}</div>
+  </div>
+  <div class="score">
+    <div class="label">{{ tr('pdf.suggested_ask') }}</div>
+    <div class="value">{% if p.ask_amount %}€ {{ '{:,}'.format(p.ask_amount).replace(',','.') }}{% else %}—{% endif %}</div>
+  </div>
+</div>
+
+<!-- AI SUMMARY -->
+{% if p.ai_summary %}
+<div class="section avoid-break">
+  <div class="section-title">{{ tr('pdf.ai_summary') }} <span class="count">{{ tr('pdf.generated_by_claude') }}</span></div>
+  <div class="section-body">
+    <p style="margin:0 0 3mm">{{ p.ai_summary }}</p>
+    {% if p.ai_next_action %}
+    <div class="card next">
+      <div class="h">{{ tr('pdf.next_best_action') }}</div>
+      <div>{{ p.ai_next_action }}</div>
+    </div>
+    {% endif %}
+    {% if p.ai_red_flags %}
+    <div class="card flag">
+      <div class="h">{{ tr('pdf.red_flags') }}</div>
+      <div>{{ p.ai_red_flags }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- IDENTITY -->
+<div class="section avoid-break">
+  <div class="section-title">{{ tr('pdf.identity_contacts') }}</div>
+  <div class="section-body">
+    <dl class="kv">
+      {% if p.email %}<dt>{{ tr('pdf.kv_email') }}</dt><dd><a href="mailto:{{ p.email }}">{{ p.email }}</a></dd>{% endif %}
+      {% if p.phone %}<dt>{{ tr('pdf.kv_phone') }}</dt><dd>{{ p.phone }}</dd>{% endif %}
+      {% if p.linkedin %}<dt>{{ tr('pdf.kv_linkedin') }}</dt><dd><a href="{{ p.linkedin }}">{{ p.linkedin }}</a></dd>{% endif %}
+      {% if p.website %}<dt>{{ tr('pdf.kv_website') }}</dt><dd><a href="{{ p.website }}">{{ p.website }}</a></dd>{% endif %}
+      {% if p.twitter %}<dt>{{ tr('pdf.kv_twitter') }}</dt><dd>{{ p.twitter }}</dd>{% endif %}
+      {% if p.country %}<dt>{{ tr('pdf.kv_country') }}</dt><dd>{{ p.country }}</dd>{% endif %}
+      {% if p.estimated_net_worth %}<dt>{{ tr('pdf.kv_net_worth') }}</dt><dd>{{ p.estimated_net_worth }}</dd>{% endif %}
+      {% if p.sectors %}<dt>{{ tr('pdf.kv_sectors') }}</dt><dd>{{ p.sectors }}</dd>{% endif %}
+      {% if p.source %}<dt>{{ tr('pdf.kv_source') }}</dt><dd>{{ p.source }}</dd>{% endif %}
+    </dl>
+  </div>
+</div>
+
+<!-- WEALTH -->
+{% if wealth %}
+<div class="section">
+  <div class="section-title">{{ tr('pdf.wealth_indicators') }} <span class="count">{{ wealth|length }} {{ tr('pdf.records') }}</span></div>
+  <table>
+    <thead><tr><th style="width:22%">{{ tr('pdf.th_category') }}</th><th>{{ tr('pdf.th_indicator') }}</th><th>{{ tr('pdf.th_detail') }}</th><th class="num">{{ tr('pdf.th_value_eur') }}</th><th style="width:12%">{{ tr('pdf.th_conf') }}</th></tr></thead>
+    <tbody>
+      {% for w in wealth %}
+      <tr>
+        <td>{{ w.category or '—' }}</td>
+        <td style="font-weight:600">{{ w.label }}</td>
+        <td style="color:#52525b">{{ w.detail or '—' }}</td>
+        <td class="num">{% if w.value_eur %}{{ '{:,}'.format(w.value_eur).replace(',','.') }}{% else %}—{% endif %}</td>
+        <td>{{ w.confidence or 'medium' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- AFFILIATIONS -->
+{% if affils %}
+<div class="section">
+  <div class="section-title">{{ tr('pdf.affiliations_board') }} <span class="count">{{ affils|length }} {{ tr('pdf.records') }}</span></div>
+  <table>
+    <thead><tr><th>{{ tr('pdf.th_organization') }}</th><th>{{ tr('pdf.th_role') }}</th><th style="width:20%">{{ tr('pdf.th_type') }}</th><th style="width:20%">{{ tr('pdf.th_period') }}</th></tr></thead>
+    <tbody>
+      {% for a in affils %}
+      <tr>
+        <td style="font-weight:600">{{ a.organization }}</td>
+        <td>{{ a.role or '—' }}</td>
+        <td>{{ a.type or '—' }}</td>
+        <td>{{ a.period or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- GIVING -->
+{% if giving %}
+<div class="section">
+  <div class="section-title">{{ tr('pdf.giving_history') }} <span class="count">{{ giving|length }} {{ tr('pdf.records') }}</span></div>
+  <table>
+    <thead><tr><th>{{ tr('pdf.th_organization') }}</th><th style="width:12%">{{ tr('pdf.th_year') }}</th><th class="num" style="width:18%">{{ tr('pdf.th_amount_eur') }}</th><th>{{ tr('pdf.th_cause') }}</th></tr></thead>
+    <tbody>
+      {% for g in giving %}
+      <tr>
+        <td style="font-weight:600">{{ g.organization or '—' }}</td>
+        <td>{{ g.year or '—' }}</td>
+        <td class="num">{% if g.amount_eur %}{{ '{:,}'.format(g.amount_eur).replace(',','.') }}{% else %}—{% endif %}</td>
+        <td style="color:#52525b">{{ g.cause or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- CONNECTIONS -->
+{% if conns %}
+<div class="section">
+  <div class="section-title">{{ tr('pdf.connections_network') }} <span class="count">{{ conns|length }} {{ tr('pdf.records') }}</span></div>
+  <table>
+    <thead><tr><th>{{ tr('pdf.th_name') }}</th><th>{{ tr('pdf.th_relationship') }}</th><th>{{ tr('pdf.th_context') }}</th><th style="width:12%">{{ tr('pdf.th_strength') }}</th></tr></thead>
+    <tbody>
+      {% for c in conns %}
+      <tr>
+        <td style="font-weight:600">{{ c.name }}{% if c.matched_prospect_id %} <span style="color:#047857;font-size:7.5pt">[{{ tr('pdf.in_crm') }}]</span>{% endif %}</td>
+        <td>{{ c.relationship or '—' }}</td>
+        <td style="color:#52525b">{{ c.context or '—' }}</td>
+        <td>{{ c.strength or 'medium' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- CONTACTS (Hunter) -->
+{% if contacts %}
+<div class="section">
+  <div class="section-title">{{ tr('pdf.decision_makers_email') }} <span class="count">Hunter.io · {{ contacts|length }}</span></div>
+  <table>
+    <thead><tr><th>{{ tr('pdf.th_name') }}</th><th>{{ tr('pdf.th_role') }}</th><th>{{ tr('pdf.th_email') }}</th><th class="num" style="width:12%">{{ tr('pdf.th_conf') }}</th></tr></thead>
+    <tbody>
+      {% for c in contacts %}
+      <tr>
+        <td style="font-weight:600">{{ c.full_name or ((c.first_name or '') + ' ' + (c.last_name or '')) }}</td>
+        <td>{{ c.position or '—' }}</td>
+        <td style="font-family:monospace;font-size:8.5pt">{{ c.email or '—' }}</td>
+        <td class="num">{{ c.confidence or '—' }}{% if c.confidence %}%{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- NEWS -->
+{% if news %}
+<div class="section">
+  <div class="section-title">{{ tr('pdf.news_mentions') }} <span class="count">{{ news|length }} {{ tr('pdf.items') }}</span></div>
+  {% for n in news %}
+  <div class="news-item">
+    <div class="news-title">{{ n.title or n.url }}</div>
+    <div class="news-meta">
+      {% if n.publisher %}<strong>{{ n.publisher }}</strong>{% endif %}
+      {% if n.published_at %} · {{ n.published_at }}{% endif %}
+      {% if n.relevance %} · {{ tr('pdf.relevance') }} {{ n.relevance }}{% endif %}
+      {% if n.sentiment %} · {{ n.sentiment }}{% endif %}
+    </div>
+    {% if n.snippet %}<div class="news-snippet">{{ n.snippet }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- NOTES -->
+{% if p.notes %}
+<div class="section avoid-break">
+  <div class="section-title">{{ tr('pdf.internal_notes') }}</div>
+  <div class="section-body" style="white-space: pre-line;">{{ p.notes }}</div>
+</div>
+{% endif %}
+
+<!-- SOURCES -->
+{% if sources %}
+<div class="section">
+  <div class="section-title">{{ tr('pdf.sources_consulted') }} <span class="count">{{ sources|length }} {{ tr('pdf.sources') }}</span></div>
+  {% for s in sources %}
+  <div class="src-item">
+    <span class="src-num">[{{ loop.index }}]</span>
+    <a class="src-link {% if s.verified == -1 %}broken{% endif %}" href="{{ s.url }}">{{ s.title or s.url }}</a>
+    {% if s.verified == 1 %}<span class="src-ok"> ✓</span>{% elif s.verified == -1 %}<span class="src-ko"> ✗</span>{% endif %}
+    <div class="src-meta">{{ s.url }}{% if s.http_status %} · HTTP {{ s.http_status }}{% endif %}{% if s.verification_note %} · {{ s.verification_note }}{% endif %}</div>
+    {% if s.snippet %}<div class="src-snippet">{{ s.snippet }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div style="margin-top: 12mm; padding-top: 4mm; border-top: 1px solid #e4e4e7; text-align:center; font-size: 8pt; color: #a1a1aa;">
+  {{ tr('pdf.footer_generated') }}<br>
+  {{ tr('pdf.footer_disclaimer') }}
+</div>
+
+</div>
+
+{% if browser_print %}
+<script>
+  window.addEventListener('load', () => {
+    setTimeout(() => window.print(), 600);
+  });
+</script>
+{% endif %}
+
+</body>
+</html>

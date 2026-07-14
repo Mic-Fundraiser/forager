@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Duplicati · Forager{% endblock %}
+{% block content %}
+
+<div class="mb-6">
+  <h1 class="text-[24px] font-bold tracking-tight text-ink-900">{{ tr('dup.title') }}</h1>
+  <p class="text-[13px] text-ink-500 mt-1">{{ tr('dup.subtitle') }}</p>
+</div>
+
+{% if not groups %}
+<div class="bg-white border border-line rounded-2xl p-10 text-center">
+  <div class="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 grid place-items-center mx-auto mb-3">
+    <i data-lucide="check" class="w-5 h-5 text-emerald-700"></i>
+  </div>
+  <h3 class="font-semibold text-ink-900">{{ tr('dup.empty_title') }}</h3>
+  <p class="text-[13px] text-ink-500 mt-1">{{ tr('dup.empty_body') }}</p>
+</div>
+{% else %}
+
+<div class="flex items-center gap-2 mb-4 text-[12.5px] text-ink-600">
+  <span class="b b-amber"><span class="dot"></span>{{ groups|length }} {{ tr('dup.candidate_groups') }}</span>
+  <span class="text-ink-400">{{ tr('dup.merge_note') }}</span>
+</div>
+
+<div class="space-y-4">
+{% for g in groups %}
+<div class="bg-white border border-line rounded-2xl overflow-hidden">
+  <form method="post" action="{{ url_for('duplicates_merge') }}">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-line bg-ink-50">
+      <div class="flex items-center gap-2">
+        <i data-lucide="copy-check" class="w-4 h-4 text-ink-700"></i>
+        <span class="text-[13px] font-semibold text-ink-900">{{ g.reason }}</span>
+        <span class="text-[11px] text-ink-500 font-mono">· {{ g.members|length }} {{ tr('dup.prospect') }}</span>
+      </div>
+      <button type="submit" class="btn-primary btn-sm" onclick="return confirm('{{ tr('dup.confirm_merge') }}')">
+        <i data-lucide="git-merge" class="w-3.5 h-3.5"></i> {{ tr('dup.run_merge') }}
+      </button>
+    </div>
+    <div class="divide-y divide-ink-100">
+      {% for m in g.members %}
+      <div class="flex items-start gap-3 px-5 py-4 hover:bg-ink-50">
+        <div class="flex flex-col gap-2 pt-1 min-w-[70px]">
+          <label class="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-700 cursor-pointer">
+            <input type="radio" name="keep_id" value="{{ m.id }}" {% if loop.first %}checked{% endif %} required>
+            {{ tr('dup.master') }}
+          </label>
+          <label class="flex items-center gap-1.5 text-[11.5px] text-rose-700 cursor-pointer">
+            <input type="checkbox" name="remove_ids" value="{{ m.id }}">
+            {{ tr('dup.merge_into') }}
+          </label>
+        </div>
+        <img class="av av-sm shrink-0" src="{{ avatar_url(m.full_name, m.photo_url, m.type, domain_from(m.website)) }}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <a href="{{ url_for('prospects_detail', pid=m.id) }}" class="font-semibold text-[14px] text-ink-900 hover:underline">{{ m.full_name }}</a>
+            <span class="b b-{{ TYPE_BADGE.get(m.type,'slate') }} !text-[10px]">{{ TYPE_LABELS.get(m.type, m.type) }}</span>
+            <span class="text-[11px] text-ink-400 font-mono">#{{ m.id }}</span>
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-[12px] text-ink-600">
+            {% if m.role %}<span><i data-lucide="briefcase" class="w-3 h-3 inline"></i> {{ m.role }}</span>{% endif %}
+            {% if m.company %}<span><i data-lucide="building-2" class="w-3 h-3 inline"></i> {{ m.company }}</span>{% endif %}
+            {% if m.email %}<span class="font-mono"><i data-lucide="mail" class="w-3 h-3 inline"></i> {{ m.email }}</span>{% endif %}
+            {% if m.linkedin %}<span class="font-mono text-[11px]"><i data-lucide="linkedin" class="w-3 h-3 inline"></i> {{ m.linkedin|replace('https://www.linkedin.com/','')|replace('https://linkedin.com/','') }}</span>{% endif %}
+            {% if m.website %}<span class="font-mono text-[11px]"><i data-lucide="globe" class="w-3 h-3 inline"></i> {{ domain_from(m.website) }}</span>{% endif %}
+            {% if m.location %}<span>{{ m.location }}</span>{% endif %}
+          </div>
+          <div class="text-[10.5px] text-ink-400 font-mono mt-1">{{ tr('dup.created') }} {{ m.created_at[:10] }} · {{ tr('dup.updated') }} {{ m.updated_at[:10] }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </form>
+</div>
+{% endfor %}
+</div>
+
+{% endif %}
+
+{% endblock %}

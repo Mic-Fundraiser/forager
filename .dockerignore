@@ -1,0 +1,13 @@
+.venv/
+data/
+backups/
+.env
+*.db
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+*.log

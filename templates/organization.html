@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% block title %}{{ tr('org.title') }} · Forager{% endblock %}
+{% block content %}
+
+<div class="flex items-end justify-between gap-4 mb-8">
+  <div>
+    <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('org.breadcrumb') }}</div>
+    <h1 class="text-[28px] font-bold tracking-tight">{{ tr('org.title') }}</h1>
+    <p class="text-[13px] text-ink-500 mt-1">{{ tr('org.intro_pre') }} <strong>{{ tr('org.intro_strong') }}</strong> {{ tr('org.intro_post') }}</p>
+  </div>
+  {% if org.name %}
+  <span class="b b-emerald"><span class="dot"></span>{{ tr('org.status_configured') }}</span>
+  {% else %}
+  <span class="b b-amber"><span class="dot"></span>{{ tr('org.status_todo') }}</span>
+  {% endif %}
+</div>
+
+<div class="bg-white border border-line rounded-xl p-6 mb-6 flex items-start gap-4">
+  <div class="w-12 h-12 rounded-xl bg-ink-100 grid place-items-center text-ink-700 shrink-0">
+    <i data-lucide="briefcase" class="w-5 h-5"></i>
+  </div>
+  <div class="flex-1">
+    <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1">{{ tr('org.briefing_claude') }}</div>
+    <h2 class="text-[18px] font-bold tracking-tight">{% if org.name %}{{ org.name }}{% else %}{{ tr('org.configure_org') }}{% endif %}</h2>
+    <p class="text-ink-600 text-[13.5px] mt-1 max-w-2xl leading-relaxed">{% if org.mission %}{{ org.mission[:240] }}{% if org.mission|length > 240 %}…{% endif %}{% else %}{{ tr('org.briefing_placeholder') }}{% endif %}</p>
+  </div>
+</div>
+
+<form method="post" class="space-y-6">
+
+  <!-- IDENTITY -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="id-card" class="w-4 h-4 text-indigo-600"></i> {{ tr('org.identity') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('org.identity_help') }}</p>
+    </div>
+    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_name') }} <span class="text-rose-500">*</span></label>
+        <input name="name" value="{{ org.name or '' }}" required placeholder="{{ tr('org.f_name_ph') }}">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_legal_form') }}</label>
+        <select name="legal_form">
+          {% set forms = ['', 'ETS', 'APS', 'ODV', 'Fondazione', 'ONLUS', 'Cooperativa sociale', 'Partito politico', 'Comitato', 'ONG', 'Impresa sociale', 'Altro'] %}
+          {% for f in forms %}<option value="{{ f }}" {% if org.legal_form==f %}selected{% endif %}>{{ f or tr('org.opt_select') }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_founding_year') }}</label>
+        <input name="founding_year" type="number" value="{{ org.founding_year or '' }}" placeholder="2002">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_hq_city') }}</label>
+        <input name="hq_city" value="{{ org.hq_city or '' }}" placeholder="Roma">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_country') }}</label>
+        <input name="country" value="{{ org.country or 'Italia' }}">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_website') }}</label>
+        <input name="website" value="{{ org.website or '' }}" placeholder="https://...">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_size') }}</label>
+        <select name="size">
+          {% for v, l in [('', tr('org.opt_select')),('micro', tr('org.size_micro')),('small', tr('org.size_small')),('medium', tr('org.size_medium')),('large', tr('org.size_large'))] %}
+            <option value="{{ v }}" {% if org.size==v %}selected{% endif %}>{{ l }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_annual_budget') }}</label>
+        <input name="annual_budget" value="{{ org.annual_budget or '' }}" placeholder="{{ tr('org.f_annual_budget_ph') }}">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_annual_budget_eur') }}</label>
+        <input name="annual_budget_eur" type="number" value="{{ org.annual_budget_eur or '' }}" placeholder="1200000">
+      </div>
+    </div>
+  </div>
+
+  <!-- MISSION -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="compass" class="w-4 h-4 text-ink-700"></i> {{ tr('org.sec_mission') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('org.sec_mission_help') }}</p>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_mission') }} <span class="text-rose-500">*</span></label>
+        <textarea name="mission" required placeholder="{{ tr('org.f_mission_ph') }}">{{ org.mission or '' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_vision') }}</label>
+        <textarea name="vision" placeholder="{{ tr('org.f_vision_ph') }}">{{ org.vision or '' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_value_prop') }}</label>
+        <textarea name="value_proposition" placeholder="{{ tr('org.f_value_prop_ph') }}">{{ org.value_proposition or '' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_positioning') }}</label>
+        <textarea name="unique_positioning" placeholder="{{ tr('org.f_positioning_ph') }}">{{ org.unique_positioning or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAUSES & PROGRAMS -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="target" class="w-4 h-4 text-emerald-600"></i> {{ tr('org.sec_causes') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('org.sec_causes_help') }}</p>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_cause_areas') }} <span class="text-rose-500">*</span></label>
+        <input name="cause_areas" value="{{ org.cause_areas or '' }}" required placeholder="{{ tr('org.f_cause_areas_ph') }}">
+        <p class="text-[11px] text-ink-400 mt-1">{{ tr('org.f_cause_areas_hint') }}</p>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_programs') }}</label>
+        <textarea name="programs" placeholder="{{ tr('org.f_programs_ph') }}">{{ org.programs or '' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_beneficiaries') }}</label>
+        <textarea name="target_beneficiaries" placeholder="{{ tr('org.f_beneficiaries_ph') }}">{{ org.target_beneficiaries or '' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_kpi') }}</label>
+        <textarea name="key_achievements" placeholder="{{ tr('org.f_kpi_ph') }}">{{ org.key_achievements or '' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_campaigns') }}</label>
+        <textarea name="recent_campaigns" placeholder="{{ tr('org.f_campaigns_ph') }}">{{ org.recent_campaigns or '' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_partnerships') }}</label>
+        <textarea name="partnerships_history" placeholder="{{ tr('org.f_partnerships_ph') }}">{{ org.partnerships_history or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- FUNDRAISING STRATEGY -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="hand-coins" class="w-4 h-4 text-amber-600"></i> {{ tr('org.sec_strategy') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('org.sec_strategy_help') }}</p>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_ideal_donor') }}</label>
+        <textarea name="ideal_donor_profile" placeholder="{{ tr('org.f_ideal_donor_ph') }}">{{ org.ideal_donor_profile or '' }}</textarea>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_ask_individual') }}</label>
+          <input name="typical_ask_individual_eur" type="number" value="{{ org.typical_ask_individual_eur or '' }}" placeholder="2500">
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_ask_corporate') }}</label>
+          <input name="typical_ask_corporate_eur" type="number" value="{{ org.typical_ask_corporate_eur or '' }}" placeholder="25000">
+        </div>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_giving_levels') }}</label>
+        <input name="giving_levels" value="{{ org.giving_levels or '' }}" placeholder="50, 100, 500, 1000, 5000, 25000">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_exclusion') }}</label>
+        <textarea name="exclusion_criteria" placeholder="{{ tr('org.f_exclusion_ph') }}">{{ org.exclusion_criteria or '' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_tone') }}</label>
+        <input name="tone_of_voice" value="{{ org.tone_of_voice or '' }}" placeholder="{{ tr('org.f_tone_ph') }}">
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTACT -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="user-round" class="w-4 h-4 text-cyan-600"></i> {{ tr('org.sec_fundraiser') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('org.sec_fundraiser_help') }}</p>
+    </div>
+    <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_fundraiser_name') }}</label>
+        <input name="fundraiser_name" value="{{ org.fundraiser_name or '' }}">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_fundraiser_email') }}</label>
+        <input name="fundraiser_email" type="email" value="{{ org.fundraiser_email or '' }}">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">{{ tr('org.f_fundraiser_phone') }}</label>
+        <input name="fundraiser_phone" value="{{ org.fundraiser_phone or '' }}">
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTES -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="sticky-note" class="w-4 h-4 text-ink-700"></i> {{ tr('org.sec_notes') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('org.sec_notes_help') }}</p>
+    </div>
+    <div class="p-6">
+      <textarea name="extra_notes" placeholder="{{ tr('org.f_notes_ph') }}" rows="5">{{ org.extra_notes or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="sticky bottom-4 z-20">
+    <div class="bg-white border border-line rounded-xl shadow-lg p-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <i data-lucide="info" class="w-4 h-4 text-indigo-600"></i>
+        <span class="text-[13px] text-ink-700">{{ tr('org.footer_note') }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="{{ url_for('research_index') }}" class="btn-ghost btn-sm">{{ tr('org.footer_goto_research') }}</a>
+        <button class="btn-primary"><i data-lucide="check" class="w-4 h-4"></i> {{ tr('org.footer_save') }}</button>
+      </div>
+    </div>
+  </div>
+
+</form>
+
+{% if org.name %}
+<div class="bg-ink-50 border border-line rounded-2xl p-6 mt-8">
+  <div class="flex items-start gap-3">
+    <i data-lucide="eye" class="w-4 h-4 text-ink-500 mt-1"></i>
+    <div class="flex-1">
+      <h3 class="text-[13px] font-semibold mb-2">{{ tr('org.preview_title') }}</h3>
+      <p class="text-[12px] text-ink-500 mb-3">{{ tr('org.preview_help') }}</p>
+      <pre class="font-mono text-[11px] bg-white border border-ink-200 rounded-lg p-4 overflow-auto max-h-[300px] whitespace-pre-wrap leading-relaxed text-ink-700">{{ preview_block }}</pre>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

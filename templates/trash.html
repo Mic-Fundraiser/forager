@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}{{ tr('trash.title') }} · Forager{% endblock %}
+{% block content %}
+
+<div class="mb-8">
+  <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('nav.section_tools') }}</div>
+  <h1 class="text-[28px] font-bold tracking-tight">{{ tr('trash.title') }}</h1>
+  <p class="text-[13.5px] text-ink-500 mt-1">{{ tr('trash.subtitle') }}</p>
+</div>
+
+{% if rows %}
+<div class="bg-white border border-line rounded-xl overflow-hidden divide-y divide-ink-100">
+  {% for r in rows %}
+  <div class="px-5 py-4 flex items-center gap-3.5">
+    <img src="{{ avatar_url(r.full_name, r.photo_url, r.type, domain_from(r.website)) }}" class="av" alt="">
+    <div class="min-w-0 flex-1">
+      <div class="font-semibold text-ink-900 text-[14px] truncate">{{ r.full_name }}</div>
+      <div class="text-[12px] text-ink-500 mt-0.5">
+        {{ TYPE_LABELS.get(r.type, r.type) }} · {{ tr('trash.deleted_on') }} {{ (r.deleted_at or '')[:10] }}
+        {% if r.gifts_count %} · <span class="text-amber-700 font-semibold">{{ r.gifts_count }} {{ tr('trash.gifts_warn') }}</span>{% endif %}
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('trash_restore', pid=r.id) }}">
+      <button class="btn-ghost btn-sm"><i data-lucide="undo-2" class="w-3.5 h-3.5"></i> {{ tr('trash.restore') }}</button>
+    </form>
+    <form method="post" action="{{ url_for('trash_purge', pid=r.id) }}"
+          data-confirm="{{ tr('trash.purge_confirm') }}" data-confirm-danger data-confirm-label="{{ tr('trash.purge') }}">
+      <button class="btn-ghost btn-sm !text-rose-600"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> {{ tr('trash.purge') }}</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-white border border-line rounded-xl px-5 py-14 text-center">
+  <i data-lucide="trash-2" class="w-7 h-7 text-ink-300 mx-auto mb-3"></i>
+  <div class="text-[13.5px] text-ink-500">{{ tr('trash.empty') }}</div>
+</div>
+{% endif %}
+
+{% endblock %}

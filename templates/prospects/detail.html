@@ -1,0 +1,984 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import stage_badge, type_badge, priority_badge, level_badge, score_ring, stars with context %}
+{% block title %}{{ p.full_name }} · Forager{% endblock %}
+{% block content %}
+
+{% set running = latest_job and latest_job.status in ('pending','running') %}
+
+<div x-data="{ edit:false, scrolled:false }" @scroll.window.passive="scrolled = (window.scrollY > 260)" @keydown.escape.window="edit=false">
+
+<div class="text-[12px] font-medium text-ink-500 mb-3">
+  <a href="{{ url_for('prospects_list') }}" class="hover:text-ink-900">{{ tr('pdetail.breadcrumb_prospects') }}</a>
+  <span class="text-ink-300 mx-1">/</span>
+  <span class="text-ink-700">{{ p.full_name }}</span>
+</div>
+
+<!-- ===================== PROFILE HEADER ===================== -->
+<div id="top" class="bg-white border border-line rounded-2xl p-6 md:p-7 mb-6 scroll-mt-[116px]">
+  <div class="flex flex-col lg:flex-row lg:items-start gap-6">
+
+    <!-- avatar + name block -->
+    <div class="flex items-start gap-5 flex-1 min-w-0">
+      <img class="av av-xl" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}">
+      <div class="min-w-0 pt-1">
+        <div class="flex flex-wrap items-center gap-1.5 mb-2.5">
+          {{ type_badge(p.type) }}
+          <span id="stageBadge">{{ stage_badge(p.stage) }}</span>
+          {{ priority_badge(p.priority, prefix=tr('pdetail.priority_prefix')) }}
+          {% if running %}<span class="b b-live"><span class="dot"></span> {{ tr('pdetail.research_running') }}</span>{% endif %}
+        </div>
+        <h1 class="text-[26px] font-bold tracking-tight text-ink-900 leading-tight">{{ p.full_name }}</h1>
+        {% if p.headline %}<p class="text-[14px] text-ink-600 mt-1.5 max-w-2xl leading-relaxed">{{ p.headline }}</p>{% endif %}
+        {% if prospect_tags %}
+        <div class="flex flex-wrap gap-1.5 mt-2.5">
+          {% for pt in prospect_tags %}
+          <span class="b b-{{ pt.color or 'slate' }} group">
+            {{ pt.name }}
+            <form method="post" action="{{ url_for('prospects_untag', pid=p.id, tid=pt.id) }}" class="inline">
+              <button class="opacity-0 group-hover:opacity-100 ml-1 hover:text-rose-700" title="{{ tr('pdetail.remove') }}">×</button>
+            </form>
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3.5 text-[13px] text-ink-600">
+          {% if p.role %}<span class="inline-flex items-center gap-1.5"><i data-lucide="briefcase" class="w-3.5 h-3.5 text-ink-400"></i>{{ p.role }}</span>{% endif %}
+          {% if p.company %}<span class="inline-flex items-center gap-1.5"><i data-lucide="building-2" class="w-3.5 h-3.5 text-ink-400"></i>{{ p.company }}</span>{% endif %}
+          {% if p.location %}<span class="inline-flex items-center gap-1.5"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-ink-400"></i>{{ p.location }}</span>{% endif %}
+          {% if p.linkedin %}<a href="{{ p.linkedin }}" target="_blank" class="inline-flex items-center gap-1.5 hover:text-ink-900"><i data-lucide="linkedin" class="w-3.5 h-3.5 text-ink-400"></i>LinkedIn</a>{% endif %}
+          {% if p.website %}<a href="{{ p.website }}" target="_blank" class="inline-flex items-center gap-1.5 hover:text-ink-900"><i data-lucide="globe" class="w-3.5 h-3.5 text-ink-400"></i>{{ domain_from(p.website) }}</a>{% endif %}
+          {% if p.email %}<a href="mailto:{{ p.email }}" class="inline-flex items-center gap-1.5 hover:text-ink-900"><i data-lucide="mail" class="w-3.5 h-3.5 text-ink-400"></i>{{ p.email }}</a>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- scores grid (separate column) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 lg:pl-7 lg:border-l border-line lg:min-w-[380px]">
+      <div class="text-center bg-ink-50 border border-line rounded-xl py-3 px-2" title="{{ tr('pdetail.score_propensity_help') }}">
+        {{ score_ring(p.propensity_score, 'lg', 'mx-auto') }}
+        <div class="mt-2 text-[10px] uppercase tracking-wider font-bold text-ink-500">{{ tr('pdetail.score_propensity') }}</div>
+      </div>
+      <div class="text-center bg-ink-50 border border-line rounded-xl py-3 px-2" title="{{ tr('pdetail.score_affinity_help') }}">
+        {{ score_ring(p.affinity_score, 'lg', 'mx-auto') }}
+        <div class="mt-2 text-[10px] uppercase tracking-wider font-bold text-ink-500">{{ tr('pdetail.score_affinity') }}</div>
+      </div>
+      <div class="text-center bg-ink-50 border border-line rounded-xl py-3 px-2 flex flex-col items-center justify-center" title="{{ tr('pdetail.score_capacity_help') }}">
+        {{ stars(p.capacity_rating, 'lg') }}
+        <div class="mt-2 text-[10px] uppercase tracking-wider font-bold text-ink-500">{{ tr('pdetail.score_capacity') }}</div>
+      </div>
+      <div class="text-center bg-ink-50 border border-line rounded-xl py-3 px-2 flex flex-col items-center justify-center">
+        <div class="text-[20px] font-bold tracking-tight font-mono leading-tight">{{ p.ask_amount|money if p.ask_amount else '—' }}</div>
+        <div class="mt-2 text-[10px] uppercase tracking-wider font-bold text-ink-500">{{ tr('pdetail.score_ask') }}</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== SUB-NAV STICKY ===================== -->
+<nav aria-label="{{ tr('pdetail.sections_nav') }}" class="sticky top-[57px] z-20 -mx-4 md:-mx-8 px-4 md:px-8 bg-white/95 backdrop-blur border-y border-line mb-6">
+  <div class="flex items-center gap-1 h-12 overflow-x-auto">
+    <a href="#top" class="flex items-center gap-2 pr-3 mr-1 border-r border-line shrink-0 no-underline" x-show="scrolled" x-cloak x-transition.opacity>
+      <img class="av av-sm" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}" alt="">
+      <span class="text-[13px] font-semibold text-ink-900 truncate max-w-[150px]">{{ p.full_name }}</span>
+      <span class="hidden sm:inline">{{ stage_badge(p.stage) }}</span>
+    </a>
+    <a href="#top" class="subnav-link">{{ tr('pdetail.nav_overview') }}</a>
+    {% if p.ai_summary %}<a href="#ai-summary" class="subnav-link">{{ tr('pdetail.nav_summary') }}</a>{% endif %}
+    <a href="#ask" class="subnav-link">{{ tr('pdetail.nav_ask') }}</a>
+    <a href="#gifts" class="subnav-link">{{ tr('pdetail.nav_gifts') }}</a>
+    <a href="#wealth" class="subnav-link">{{ tr('pdetail.nav_wealth') }}</a>
+    <a href="#contacts" class="subnav-link">{{ tr('pdetail.nav_contacts') }}</a>
+    <a href="#activity" class="subnav-link">{{ tr('pdetail.nav_activity') }}</a>
+    <a href="#news" class="subnav-link">{{ tr('pdetail.nav_news') }}</a>
+    <a href="#sources" class="subnav-link">{{ tr('pdetail.nav_sources') }}</a>
+  </div>
+</nav>
+
+<!-- ===================== ACTIONS BAR ===================== -->
+<div class="flex flex-wrap items-center gap-2 mb-6">
+  <form method="post" action="{{ url_for('prospects_research', pid=p.id) }}">
+    <button class="btn-primary btn-sm" {% if running %}disabled{% endif %}>
+      {% if running %}<span class="spinner"></span> {{ tr('pdetail.research_running') }}{% else %}<i data-lucide="refresh-ccw" class="w-3.5 h-3.5"></i> {{ tr('pdetail.btn_update_research') }}{% endif %}
+    </button>
+  </form>
+  <select id="stageSelect" class="!w-auto !text-[12.5px] !py-1.5" aria-label="{{ tr('pdetail.field_stage') }}"
+          hx-post="{{ url_for('prospects_stage', pid=p.id) }}" hx-trigger="change" hx-swap="none" name="stage"
+          hx-on::after-request="if(event.detail.successful){ updateStageBadge(this); }">
+    {% for s in STAGES %}<option value="{{ s }}" data-badge="{{ STAGE_BADGE.get(s,'slate') }}" data-label="{{ STAGE_LABELS[s] }}" {% if p.stage==s %}selected{% endif %}>{{ tr('pdetail.stage_prefix') }} {{ STAGE_LABELS[s] }}</option>{% endfor %}
+  </select>
+  <a href="{{ url_for('compose', pid=p.id) }}" class="btn-ghost btn-sm"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> {{ tr('pdetail.btn_ai_compose') }}</a>
+  <a href="{{ url_for('briefing', pid=p.id) }}" class="btn-ghost btn-sm"><i data-lucide="file-text" class="w-3.5 h-3.5"></i> {{ tr('pdetail.btn_briefing') }}</a>
+  <button type="button" @click="edit=true" class="btn-ghost btn-sm"><i data-lucide="pencil" class="w-3.5 h-3.5"></i> {{ tr('pdetail.btn_edit') }}</button>
+
+  <!-- Altre azioni (overflow) -->
+  <div x-data="{ more:false }" class="relative">
+    <button type="button" @click="more=!more" @click.outside="more=false" class="btn-ghost btn-sm" :aria-expanded="more" aria-haspopup="menu">
+      <i data-lucide="more-horizontal" class="w-3.5 h-3.5"></i> {{ tr('pdetail.more_actions') }}
+    </button>
+    <div x-show="more" x-cloak x-transition.origin.top.left class="absolute left-0 mt-2 w-60 bg-white border border-line rounded-xl shadow-xl py-1.5 z-40" role="menu">
+      <form data-busy data-busy-text="{{ tr('pdetail.busy_updating') }}" method="post" action="{{ url_for('prospects_refresh', pid=p.id) }}" role="none">
+        <button class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50" role="menuitem"><i data-lucide="sparkles" class="w-4 h-4 text-ink-400"></i> {{ tr('pdetail.btn_update_ai_insights') }}</button>
+      </form>
+      <a href="{{ url_for('sequence_new', pid=p.id) }}" class="flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50" role="menuitem"><i data-lucide="list-checks" class="w-4 h-4 text-ink-400"></i> {{ tr('pdetail.btn_sequence') }}</a>
+      <a href="{{ url_for('prospects_chat', pid=p.id) }}" class="flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50" role="menuitem"><i data-lucide="message-circle" class="w-4 h-4 text-ink-400"></i> {{ tr('pdetail.btn_chat_ai') }}</a>
+      <a href="{{ url_for('prospects_network', pid=p.id) }}" class="flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50" role="menuitem"><i data-lucide="network" class="w-4 h-4 text-ink-400"></i> {{ tr('pdetail.btn_network') }}</a>
+      <a href="{{ url_for('prospects_print', pid=p.id) }}" target="_blank" rel="noopener" class="flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50" role="menuitem"><i data-lucide="file-down" class="w-4 h-4 text-ink-400"></i> {{ tr('pdetail.btn_export_pdf') }}</a>
+      <form method="post" action="{{ url_for('prospects_delete', pid=p.id) }}" data-confirm="{{ tr('pdetail.confirm_delete_prospect') }} {{ p.full_name }}?" data-confirm-danger data-confirm-label="{{ tr('pdetail.btn_delete') }}" class="border-t border-line mt-1 pt-1" role="none">
+        <button class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-rose-600 hover:bg-rose-50" role="menuitem"><i data-lucide="trash-2" class="w-4 h-4"></i> {{ tr('pdetail.btn_delete') }}</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if running %}
+<div class="flex items-start gap-3 px-4 py-3.5 rounded-xl border bg-amber-50 border-amber-200 text-amber-900 mb-6">
+  <span class="spinner mt-0.5"></span>
+  <div class="flex-1">
+    <div class="font-semibold text-[13px]">{{ tr('pdetail.investigating_prefix') }} "{{ p.full_name }}"</div>
+    <div class="text-[12px] mt-0.5">{{ tr('pdetail.investigating_detail') }}</div>
+  </div>
+  <span class="font-mono text-[11px]" id="job-status">{{ latest_job.status }}</span>
+</div>
+<script>
+  const jobId = {{ latest_job.id }};
+  const JOB_LABELS = { pending: '{{ tr("pdetail.job_pending") }}', running: '{{ tr("pdetail.job_running") }}', done: '{{ tr("pdetail.job_done") }}', error: '{{ tr("pdetail.job_error") }}' };
+  const jobStatusEl = document.getElementById('job-status');
+  if (jobStatusEl) jobStatusEl.textContent = JOB_LABELS[jobStatusEl.textContent.trim()] || jobStatusEl.textContent;
+  async function poll() {
+    const r = await fetch('/api/jobs/' + jobId);
+    if (!r.ok) return;
+    const j = await r.json();
+    if (jobStatusEl) jobStatusEl.textContent = JOB_LABELS[j.status] || j.status;
+    if (j.status === 'done') { if(window.toast) window.toast('{{ tr("pdetail.job_done") }}', {type:'success'}); setTimeout(()=>location.reload(), 900); return; }
+    if (j.status === 'error') { if(window.toast) window.toast('{{ tr("pdetail.research_error") }}', {type:'error'}); setTimeout(()=>location.reload(), 1200); return; }
+    setTimeout(poll, 4000);
+  }
+  poll();
+</script>
+{% endif %}
+
+{% if latest_job and latest_job.status == 'error' %}
+<div class="flex items-start gap-3 px-4 py-3.5 rounded-xl border bg-rose-50 border-rose-200 text-rose-900 mb-6">
+  <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+  <div><strong>{{ tr('pdetail.research_error') }}</strong> {{ latest_job.error }}</div>
+</div>
+{% endif %}
+
+{% if not p.ai_summary and not running and not (latest_job and latest_job.status == 'error') %}
+<div class="bg-white border border-line rounded-xl p-8 mb-6 text-center">
+  <div class="w-12 h-12 mx-auto mb-3 rounded-xl bg-ink-900 grid place-items-center text-white"><i data-lucide="sparkles" class="w-5 h-5"></i></div>
+  <div class="font-semibold text-ink-900 text-[15px]">{{ tr('pdetail.empty_profile_title') }}</div>
+  <p class="text-[13px] text-ink-500 mt-1 mb-4 max-w-md mx-auto">{{ tr('pdetail.empty_profile_desc') }}</p>
+  <form method="post" action="{{ url_for('prospects_research', pid=p.id) }}" class="inline">
+    <button class="btn-primary"><i data-lucide="search" class="w-4 h-4"></i> {{ tr('pdetail.btn_start_research') }}</button>
+  </form>
+</div>
+{% endif %}
+
+{% if p.ai_red_flags %}
+{# collassato di default: una riga; il testo completo a click (era un blocco rosa invasivo) #}
+<div x-data="{ open: false }" class="rounded-xl border bg-rose-50 border-rose-200 text-rose-900 mb-6 overflow-hidden">
+  <button type="button" @click="open = !open" class="w-full flex items-center gap-3 px-4 py-2.5 text-left" :aria-expanded="open">
+    <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+    <span class="text-[13px] leading-snug flex-1 min-w-0 font-semibold" :class="!open && 'truncate'">
+      {{ tr('pdetail.red_flags_warning') }} <span class="font-normal" x-show="!open">{{ p.ai_red_flags|truncate(90) }}</span>
+    </span>
+    <span class="text-[11px] font-semibold shrink-0 underline underline-offset-2" x-text="open ? '{{ tr('pdetail.red_flags_hide') }}' : '{{ tr('pdetail.red_flags_show') }}'"></span>
+  </button>
+  <div x-show="open" x-cloak class="px-4 pb-3 pl-11 text-[13px] leading-relaxed">{{ p.ai_red_flags }}</div>
+</div>
+{% endif %}
+
+<!-- ===================== ASK CONSIGLIATO ===================== -->
+<div id="ask" class="bg-white border border-line rounded-xl p-5 mb-6 scroll-mt-[116px]">
+  <div class="flex items-center justify-between gap-3">
+    <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="hand-coins" class="w-4 h-4 text-ink-500"></i> {{ tr('pdetail.suggested_ask_title') }}</h3>
+    <form data-busy data-busy-text="{{ tr('pdetail.busy_calculating') }}" method="post" action="{{ url_for('prospects_suggest_ask', pid=p.id) }}">
+      <button class="btn-ghost btn-sm"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> {% if p.suggested_ask_eur %}{{ tr('pdetail.btn_recalculate') }}{% else %}{{ tr('pdetail.btn_suggest_ask') }}{% endif %}</button>
+    </form>
+  </div>
+  {% if p.suggested_ask_eur %}
+  <div class="mt-4 flex items-end gap-6 flex-wrap">
+    <div>
+      <div class="text-[30px] font-bold font-mono tracking-tight leading-none">{{ p.suggested_ask_eur|money }}</div>
+      <div class="mt-1 text-[10px] uppercase tracking-wider font-bold text-ink-500">{{ tr('pdetail.suggested_target') }}</div>
+    </div>
+    {% if p.suggested_ask_low_eur or p.suggested_ask_high_eur %}
+    <div class="text-[13px] text-ink-600 pb-1">
+      {{ tr('pdetail.range_label') }} <span class="font-semibold">{{ p.suggested_ask_low_eur|money if p.suggested_ask_low_eur else '—' }}</span>
+      → <span class="font-semibold">{{ p.suggested_ask_high_eur|money if p.suggested_ask_high_eur else '—' }}</span>
+    </div>
+    {% endif %}
+    <div class="pb-1">
+      {% if p.ask_amount == p.suggested_ask_eur %}
+      <span class="b b-emerald !text-[11px]"><span class="dot"></span>{{ tr('pdetail.in_pipeline') }}</span>
+      {% else %}
+      <form method="post" action="{{ url_for('prospects_use_suggested_ask', pid=p.id) }}">
+        <button class="btn-primary btn-sm" title="{{ tr('pdetail.use_in_pipeline_title') }}">
+          <i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5"></i> {{ tr('pdetail.btn_use_in_pipeline') }}
+        </button>
+      </form>
+      {% if p.ask_amount %}<div class="text-[11px] text-ink-400 mt-1">{{ tr('pdetail.current_ask_in_pipeline') }} {{ p.ask_amount|money }}</div>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+  {% if p.ask_rationale %}<p class="mt-3 text-[13px] leading-relaxed text-ink-700 bg-ink-50 border border-line rounded-lg px-4 py-3">{{ p.ask_rationale }}</p>{% endif %}
+  {% else %}
+  <p class="mt-3 text-[13px] text-ink-500 leading-relaxed">{{ tr('pdetail.suggested_ask_empty') }}</p>
+  {% endif %}
+</div>
+
+<!-- ===================== DONAZIONI (gift reali) ===================== -->
+<div id="gifts" class="bg-white border border-line rounded-xl overflow-hidden mb-6 scroll-mt-[116px]">
+  <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+    <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="banknote" class="w-4 h-4 text-emerald-600"></i> {{ tr('pdetail.gifts_to_us_title') }}</h3>
+    <div class="text-right">
+      <div class="text-[18px] font-bold font-mono leading-none">{{ gift_received|money if gift_received else '€ 0' }}</div>
+      <div class="text-[10px] uppercase tracking-wider font-bold text-ink-500 mt-1">{{ tr('pdetail.gifts_raised') }}</div>
+    </div>
+  </div>
+
+  <div class="p-5 border-b border-line bg-ink-50/40">
+    <form method="post" action="{{ url_for('gifts_add', pid=p.id) }}" class="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+      <div class="field !mb-0"><label class="label">{{ tr('pdetail.gift_amount_label') }}</label><input name="amount_eur" type="number" min="1" required placeholder="1000" class="!py-1.5 !text-[13px]"></div>
+      <div class="field !mb-0"><label class="label">{{ tr('pdetail.gift_status_label') }}</label><select name="status" class="!py-1.5 !text-[13px]">{% for k,v in GIFT_STATUS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+      <div class="field !mb-0"><label class="label">{{ tr('pdetail.gift_kind_label') }}</label><select name="kind" class="!py-1.5 !text-[13px]">{% for k,v in GIFT_KINDS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+      <div class="field !mb-0"><label class="label">{{ tr('pdetail.gift_date_label') }}</label><input name="gift_date" type="date" class="!py-1.5 !text-[13px]"></div>
+      <div class="field !mb-0"><label class="label">{{ tr('pdetail.gift_campaign_label') }}</label>
+        <select name="campaign_id" class="!py-1.5 !text-[13px]">
+          <option value="">{{ tr('camp.none_select') }}</option>
+          {% for c in active_campaigns %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <button class="btn-primary btn-sm !justify-center"><i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('pdetail.btn_register_gift') }}</button>
+      <div class="col-span-2 md:col-span-6 flex flex-wrap items-center gap-5 pt-1">
+        <label class="flex items-center gap-2 text-[12.5px] text-ink-700"><input type="checkbox" name="is_deductible" value="1" class="!w-4 !h-4 rounded border-line"> {{ tr('gift.deductible') }}</label>
+        <label class="flex items-center gap-2 text-[12.5px] text-ink-700"><input type="checkbox" name="receipt_sent" value="1" class="!w-4 !h-4 rounded border-line"> {{ tr('gift.receipt_sent') }}</label>
+        <a href="{{ url_for('campaigns') }}" class="text-[11.5px] text-ink-400 hover:text-ink-900 ml-auto">{{ tr('camp.new') }} →</a>
+      </div>
+    </form>
+  </div>
+
+  {% if gifts %}
+  <div class="table-wrap"><table class="tbl">
+    <thead><tr><th class="text-right">{{ tr('pdetail.th_amount') }}</th><th>{{ tr('pdetail.th_status') }}</th><th>{{ tr('pdetail.th_kind') }}</th><th>{{ tr('pdetail.th_date') }}</th><th>{{ tr('pdetail.th_campaign') }}</th><th>{{ tr('pdetail.th_thanked') }}</th><th></th></tr></thead>
+    <tbody>
+      {% for g in gifts %}
+      <tr>
+        <td class="text-right font-mono text-[13px] font-bold {% if g.status=='received' %}text-emerald-700{% else %}text-ink-500{% endif %}">{{ g.amount_eur|money }}</td>
+        <td><span class="b {% if g.status=='received' %}b-emerald{% else %}b-amber{% endif %} !text-[10px]">{{ GIFT_STATUS.get(g.status, g.status) }}</span></td>
+        <td class="text-[12.5px] text-ink-600">{{ GIFT_KINDS.get(g.kind, g.kind) }}</td>
+        <td class="font-mono text-[12px] text-ink-500">{{ g.gift_date or '—' }}</td>
+        <td class="text-[12.5px] text-ink-600">
+          {{ g.campaign_name or g.campaign or '—' }}
+          {% if g.is_deductible %}
+          <form method="post" action="{{ url_for('gifts_receipt', gid=g.id) }}" class="inline ml-1">
+            {% if g.receipt_sent %}
+            <button class="b b-emerald !text-[10px]" title="{{ tr('gift.receipt_sent') }}"><i data-lucide="receipt" class="w-3 h-3"></i> {{ tr('gift.deductible_short') }}</button>
+            {% else %}
+            <button class="b b-amber !text-[10px]" title="{{ tr('gift.mark_receipt') }}"><i data-lucide="receipt" class="w-3 h-3"></i> {{ tr('gift.receipt_missing') }}</button>
+            {% endif %}
+          </form>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('gifts_thank', gid=g.id) }}" class="inline">
+            {% if g.thanked %}
+              <button class="b b-emerald !text-[10px]" title="{{ tr('pdetail.thanked_at_title') }} {{ g.thanked_at[:10] if g.thanked_at }} · {{ tr('pdetail.thanked_click_undo') }}"><i data-lucide="check" class="w-3 h-3"></i> {{ tr('pdetail.thanked_yes') }}</button>
+            {% else %}
+              <button class="b b-rose !text-[10px]" title="{{ tr('pdetail.mark_thanked_title') }}"><i data-lucide="bell" class="w-3 h-3"></i> {{ tr('pdetail.thanked_todo') }}</button>
+            {% endif %}
+          </form>
+        </td>
+        <td><form method="post" action="{{ url_for('gifts_delete', gid=g.id) }}" data-confirm="{{ tr('pdetail.confirm_delete_gift') }}" data-confirm-danger data-confirm-label="{{ tr('common.delete') }}"><button class="text-ink-300 hover:text-rose-600 tap" aria-label="{{ tr('common.delete') }}"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></form></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="px-6 py-8 text-center text-[13px] text-ink-500">{{ tr('pdetail.gifts_empty') }}</div>
+  {% endif %}
+</div>
+
+<!-- ===================== CONTENT GRID ===================== -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+<div class="xl:col-span-2 space-y-6">
+
+  {% if p.ai_summary %}
+  <div id="ai-summary" class="bg-white border border-line rounded-xl overflow-hidden scroll-mt-[116px]">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="sparkles" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.ai_summary_title') }}</h3>
+      <span class="b b-slate">{{ tr('pdetail.generated_by_claude') }}</span>
+    </div>
+    <div class="p-6">
+      <p class="text-[14px] leading-relaxed text-ink-800">{{ p.ai_summary }}</p>
+      {% if p.ai_next_action %}
+      <div class="mt-5 flex items-start gap-3 p-4 rounded-xl bg-ink-50 border border-line">
+        <div class="w-8 h-8 rounded-lg bg-white border border-line grid place-items-center text-ink-900 shrink-0"><i data-lucide="arrow-right" class="w-4 h-4"></i></div>
+        <div>
+          <div class="text-[11px] font-bold uppercase tracking-wider text-ink-700">{{ tr('pdetail.next_best_action') }}</div>
+          <div class="text-[14px] text-ink-800 mt-1">{{ p.ai_next_action }}</div>
+        </div>
+      </div>
+      {% endif %}
+      {% if p.ai_red_flags %}
+      <div class="mt-3 flex items-start gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200">
+        <div class="w-8 h-8 rounded-lg bg-white border border-rose-200 grid place-items-center text-rose-700 shrink-0"><i data-lucide="alert-triangle" class="w-4 h-4"></i></div>
+        <div>
+          <div class="text-[11px] font-bold uppercase tracking-wider text-rose-800">{{ tr('pdetail.red_flags') }}</div>
+          <div class="text-[14px] text-ink-800 mt-1">{{ p.ai_red_flags }}</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- WEALTH -->
+  <div id="wealth" class="bg-white border border-line rounded-xl overflow-hidden scroll-mt-[116px]">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="gem" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.wealth_title') }}</h3>
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] text-ink-400 font-mono">{{ wealth|length }} {{ tr('pdetail.records') }}</span>
+        <form data-busy data-busy-text="{{ tr('pdetail.busy_deep_diving') }}" method="post" action="{{ url_for('prospects_deep_dive', pid=p.id, section='wealth') }}">
+          <button class="btn-ghost btn-sm !py-1 !px-2 !text-[11px]" title="{{ tr('pdetail.deep_dive_wealth_title') }}"><i data-lucide="sparkles" class="w-3 h-3"></i> {{ tr('pdetail.btn_deep_dive') }}</button>
+        </form>
+      </div>
+    </div>
+    {% if wealth %}
+    <div class="table-wrap"><table class="tbl">
+      <thead><tr><th>{{ tr('pdetail.th_category') }}</th><th>{{ tr('pdetail.th_indicator') }}</th><th>{{ tr('pdetail.th_detail') }}</th><th class="text-right">{{ tr('pdetail.th_value') }}</th><th>{{ tr('pdetail.th_conf') }}</th><th>{{ tr('pdetail.th_source') }}</th></tr></thead>
+      <tbody>
+        {% for w in wealth %}
+        <tr>
+          <td><span class="b b-slate">{{ w.category or '—' }}</span></td>
+          <td class="font-semibold text-ink-900 text-[13px]">{{ w.label }}</td>
+          <td class="text-ink-500 text-[13px]">{{ w.detail or '—' }}</td>
+          <td class="text-right font-mono text-[13px] font-semibold">{{ w.value_eur|money if w.value_eur else '—' }}</td>
+          <td>{{ level_badge(w.confidence) }}</td>
+          <td>{% if w.source %}<a href="{{ w.source }}" target="_blank" class="text-ink-500 hover:text-ink-900"><i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}
+    <div class="px-6 py-10 text-center text-[13px] text-ink-500">{{ tr('pdetail.wealth_empty') }}</div>
+    {% endif %}
+  </div>
+
+  <!-- AFFILIATIONS -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="award" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.affiliations_title') }}</h3>
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] text-ink-400 font-mono">{{ affils|length }}</span>
+        <form data-busy data-busy-text="{{ tr('pdetail.busy_deep_diving') }}" method="post" action="{{ url_for('prospects_deep_dive', pid=p.id, section='affiliations') }}">
+          <button class="btn-ghost btn-sm !py-1 !px-2 !text-[11px]" title="{{ tr('pdetail.deep_dive_affiliations_title') }}"><i data-lucide="sparkles" class="w-3 h-3"></i> {{ tr('pdetail.btn_deep_dive') }}</button>
+        </form>
+      </div>
+    </div>
+    {% if affils %}
+    <div class="table-wrap"><table class="tbl">
+      <thead><tr><th>{{ tr('pdetail.th_organization') }}</th><th>{{ tr('pdetail.th_role') }}</th><th>{{ tr('pdetail.th_kind') }}</th><th>{{ tr('pdetail.th_period') }}</th><th>{{ tr('pdetail.th_source') }}</th></tr></thead>
+      <tbody>
+        {% for a in affils %}
+        <tr><td class="font-semibold text-ink-900 text-[13px]">{{ a.organization }}</td><td class="text-[13px] text-ink-600">{{ a.role or '—' }}</td><td><span class="b b-slate">{{ a.type or '—' }}</span></td><td class="text-[13px] text-ink-600">{{ a.period or '—' }}</td><td>{% if a.source %}<a href="{{ a.source }}" target="_blank" class="text-ink-500 hover:text-ink-900"><i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>{% else %}—{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<div class="px-6 py-10 text-center text-[13px] text-ink-500">{{ tr('pdetail.affiliations_empty') }}</div>{% endif %}
+  </div>
+
+  <!-- HUNTER -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden scroll-mt-[116px]" id="contacts">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2">
+        <i data-lucide="at-sign" class="w-4 h-4 text-ink-700"></i>
+        {{ tr('pdetail.decision_makers_title') }}
+        <span class="b b-cyan">Hunter.io</span>
+      </h3>
+      <span class="text-[11px] text-ink-400 font-mono">{{ contacts|length }} {{ tr('pdetail.contacts') }}</span>
+    </div>
+    <div class="p-6">
+      {% if not contacts %}
+      <div class="flex items-start gap-3 p-4 rounded-xl bg-ink-50 border border-line mb-4">
+        <div class="w-8 h-8 rounded-lg bg-white border border-line grid place-items-center text-ink-700 shrink-0"><i data-lucide="mail-search" class="w-4 h-4"></i></div>
+        <div>
+          <div class="text-[11px] font-bold uppercase tracking-wider text-ink-700">{{ tr('pdetail.no_decision_makers') }}</div>
+          <div class="text-[13px] text-ink-700 mt-1">{% if derived_domain %}{{ tr('pdetail.search_on') }} <strong>{{ derived_domain }}</strong> {{ tr('pdetail.search_clevel_hint') }}{% else %}{{ tr('pdetail.add_website_hint') }}{% endif %}</div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="flex flex-wrap gap-2 mb-4">
+        {% if derived_domain %}
+        <form data-busy data-busy-text="{{ tr('pdetail.busy_searching') }}" method="post" action="{{ url_for('prospects_find_emails', pid=p.id) }}">
+          <input type="hidden" name="domain" value="{{ derived_domain }}">
+          <button class="btn-primary btn-sm" {% if contacts %}onclick="return confirm('{{ tr('pdetail.confirm_refetch') }}')"{% endif %}>
+            <i data-lucide="mail-search" class="w-3.5 h-3.5"></i>
+            {% if contacts %}{{ tr('pdetail.btn_refetch_dm') }}{% else %}{{ tr('pdetail.btn_find_dm_on') }} {{ derived_domain }}{% endif %}
+          </button>
+        </form>
+        {% if contacts %}
+        <form data-busy data-busy-text="{{ tr('pdetail.busy_searching') }}" method="post" action="{{ url_for('prospects_find_emails', pid=p.id) }}">
+          <input type="hidden" name="domain" value="{{ derived_domain }}">
+          <input type="hidden" name="force" value="1">
+          <button class="btn-ghost btn-sm" onclick="return confirm('{{ tr('pdetail.confirm_force_refresh') }}')"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> {{ tr('pdetail.btn_force_refresh') }}</button>
+        </form>
+        {% endif %}
+        {% endif %}
+      </div>
+
+      <details class="rounded-xl border border-line group mb-4 bg-ink-50/40" {% if open_finder %}open{% endif %}>
+        <summary class="cursor-pointer p-4 list-none flex items-center gap-2 text-[13px] font-semibold text-ink-800 select-none">
+          <i data-lucide="user-search" class="w-4 h-4 text-ink-700"></i>
+          {{ tr('pdetail.find_person_email_title') }}
+          <span class="b b-amber ml-2">{{ tr('pdetail.one_credit') }}</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 ml-auto text-ink-400 transition-transform group-open:rotate-180"></i>
+        </summary>
+        <div class="px-4 pb-4 border-t border-line pt-4">
+          <form data-busy data-busy-text="{{ tr('pdetail.busy_searching') }}" method="post" action="{{ url_for('prospects_find_personal', pid=p.id) }}">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div class="field"><label class="label">{{ tr('pdetail.first_name_label') }} <span class="req">*</span></label><input name="first_name" required placeholder="Mario"></div>
+              <div class="field"><label class="label">{{ tr('pdetail.last_name_label') }} <span class="req">*</span></label><input name="last_name" required placeholder="Rossi"></div>
+              <div class="field"><label class="label">{{ tr('pdetail.domain_label') }} <span class="req">*</span></label><input name="domain" value="{{ derived_domain or '' }}" placeholder="azienda.com" required></div>
+            </div>
+            <p class="text-[11.5px] text-ink-500 mt-2">{{ tr('pdetail.find_person_hint') }}</p>
+            <button class="btn-primary btn-sm mt-3"><i data-lucide="search" class="w-3.5 h-3.5"></i> {{ tr('pdetail.btn_find_email') }}</button>
+          </form>
+        </div>
+      </details>
+
+      {% if contacts %}
+      <div class="border border-line rounded-xl overflow-hidden">
+        <div class="table-wrap"><table class="tbl">
+          <thead><tr><th>{{ tr('pdetail.th_name') }}</th><th>{{ tr('pdetail.th_role') }}</th><th>{{ tr('pdetail.th_email') }}</th><th>{{ tr('pdetail.th_conf') }}</th><th></th></tr></thead>
+          <tbody>
+            {% for c in contacts %}
+            <tr>
+              <td>
+                <div class="font-semibold text-ink-900 text-[13px]">{{ c.full_name or ((c.first_name or '') + ' ' + (c.last_name or '')) }}</div>
+                {% if c.seniority %}<div class="text-[11px] text-ink-500 mt-0.5">{{ c.seniority }}{% if c.department %} · {{ c.department }}{% endif %}</div>{% endif %}
+              </td>
+              <td class="text-[13px] text-ink-700">{{ c.position or '—' }}</td>
+              <td>{% if c.email %}<a href="mailto:{{ c.email }}" class="font-mono text-[12px] text-ink-700 hover:text-ink-900">{{ c.email }}</a>{% else %}—{% endif %}</td>
+              <td>{% if c.confidence is not none %}{% set conf=c.confidence|int %}<span class="b {% if conf>=80 %}b-emerald{% elif conf>=50 %}b-amber{% else %}b-rose{% endif %}">{{ conf }}%</span>{% else %}—{% endif %}</td>
+              <td>
+                <div class="flex items-center gap-2 text-ink-400">
+                  {% if c.linkedin %}<a href="{{ c.linkedin }}" target="_blank" class="hover:text-ink-700" title="LinkedIn"><i data-lucide="linkedin" class="w-3.5 h-3.5"></i></a>{% endif %}
+                  {% if c.twitter %}<a href="https://twitter.com/{{ c.twitter }}" target="_blank" class="hover:text-ink-700" title="Twitter"><i data-lucide="twitter" class="w-3.5 h-3.5"></i></a>{% endif %}
+                  {% if c.phone %}<a href="tel:{{ c.phone }}" class="hover:text-ink-700"><i data-lucide="phone" class="w-3.5 h-3.5"></i></a>{% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table></div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- GIVING -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="hand-coins" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.giving_history_title') }}</h3>
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] text-ink-400 font-mono">{{ giving|length }}</span>
+        <form data-busy data-busy-text="{{ tr('pdetail.busy_deep_diving') }}" method="post" action="{{ url_for('prospects_deep_dive', pid=p.id, section='giving') }}">
+          <button class="btn-ghost btn-sm !py-1 !px-2 !text-[11px]" title="{{ tr('pdetail.deep_dive_giving_title') }}"><i data-lucide="sparkles" class="w-3 h-3"></i> {{ tr('pdetail.btn_deep_dive') }}</button>
+        </form>
+      </div>
+    </div>
+    {% if giving %}
+    <div class="table-wrap"><table class="tbl">
+      <thead><tr><th>{{ tr('pdetail.th_organization') }}</th><th>{{ tr('pdetail.th_year') }}</th><th class="text-right">{{ tr('pdetail.th_amount') }}</th><th>{{ tr('pdetail.th_cause') }}</th><th>{{ tr('pdetail.th_source') }}</th></tr></thead>
+      <tbody>
+        {% for g in giving %}
+        <tr><td class="font-semibold text-ink-900 text-[13px]">{{ g.organization or '—' }}</td><td class="font-mono text-[13px]">{{ g.year or '—' }}</td><td class="text-right font-mono text-[13px] font-semibold">{{ g.amount_eur|money if g.amount_eur else '—' }}</td><td class="text-[13px] text-ink-600">{{ g.cause or '—' }}</td><td>{% if g.source %}<a href="{{ g.source }}" target="_blank" class="text-ink-500 hover:text-ink-900"><i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>{% else %}—{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<div class="px-6 py-10 text-center text-[13px] text-ink-500">{{ tr('pdetail.giving_empty') }}</div>{% endif %}
+  </div>
+
+  <!-- CONNECTIONS -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="network" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.connections_title') }}</h3>
+      <div class="flex items-center gap-2">
+        <form data-busy data-busy-text="{{ tr('pdetail.busy_deep_diving') }}" method="post" action="{{ url_for('prospects_deep_dive', pid=p.id, section='network') }}">
+          <button class="btn-ghost btn-sm !py-1 !px-2 !text-[11px]" title="{{ tr('pdetail.deep_dive_network_title') }}"><i data-lucide="sparkles" class="w-3 h-3"></i> {{ tr('pdetail.btn_deep_dive') }}</button>
+        </form>
+        <a href="{{ url_for('prospects_network', pid=p.id) }}" class="text-[12px] text-ink-500 hover:text-ink-900">{{ tr('pdetail.see_network') }}</a>
+      </div>
+    </div>
+    {% if conns %}
+    <div class="table-wrap"><table class="tbl">
+      <thead><tr><th>{{ tr('pdetail.th_name') }}</th><th>{{ tr('pdetail.th_relationship') }}</th><th>{{ tr('pdetail.th_context') }}</th><th>{{ tr('pdetail.th_strength') }}</th></tr></thead>
+      <tbody>
+        {% for c in conns %}
+        <tr>
+          <td class="font-semibold text-ink-900 text-[13px]">
+            {% if c.matched_prospect_id %}
+              <a href="{{ url_for('prospects_detail', pid=c.matched_prospect_id) }}" class="hover:underline">{{ c.name }}</a>
+              <span class="b b-emerald !text-[10px] ml-1"><span class="dot"></span>{{ tr('pdetail.in_crm') }}</span>
+            {% else %}{{ c.name }}{% endif %}
+          </td>
+          <td class="text-[13px] text-ink-600">{{ c.relationship or '—' }}</td>
+          <td class="text-[13px] text-ink-500">{{ c.context or '—' }}</td>
+          <td>{{ level_badge(c.strength) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<div class="px-6 py-10 text-center text-[13px] text-ink-500">{{ tr('pdetail.connections_empty') }}</div>{% endif %}
+  </div>
+
+  <!-- ACTIVITIES -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden scroll-mt-[116px]" id="activity">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="message-square-text" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.activity_title') }}</h3>
+    </div>
+    <div class="p-6">
+      <form method="post" action="{{ url_for('prospects_activity', pid=p.id) }}" class="mb-5">
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-3 mb-3">
+          <input name="title" placeholder="{{ tr('pdetail.activity_title_placeholder') }}" required>
+          <select name="type">
+            <option value="note">{{ tr('pdetail.activity_type_note') }}</option>
+            <option value="email">{{ tr('pdetail.activity_type_email') }}</option>
+            <option value="call">{{ tr('pdetail.activity_type_call') }}</option>
+            <option value="meeting">{{ tr('pdetail.activity_type_meeting') }}</option>
+            <option value="task">{{ tr('pdetail.activity_type_task') }}</option>
+          </select>
+        </div>
+        <textarea name="body" placeholder="{{ tr('pdetail.activity_body_placeholder') }}" class="mb-3"></textarea>
+        <button class="btn-primary btn-sm"><i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('pdetail.btn_add_activity') }}</button>
+      </form>
+      {% if acts %}
+      {% for a in acts %}
+      <div class="tl-row">
+        <div class="d" style="background: {% if a.type=='ai_research' %}#0d9488{% elif a.type=='stage_change' %}#10b981{% elif a.type=='email' %}#0891b2{% else %}#18181b{% endif %}"></div>
+        <div class="min-w-0">
+          <div class="font-semibold text-[13px] text-ink-900">{{ a.title or a.type }}</div>
+          <div class="text-[11px] text-ink-400 font-mono mt-0.5">{{ a.happened_at }} · {{ a.type }}</div>
+          {% if a.body %}<div class="text-[12.5px] text-ink-600 mt-1.5 leading-relaxed whitespace-pre-line">{{ a.body }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="text-[13px] text-ink-500 text-center py-6">{{ tr('pdetail.activity_empty') }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- SIDEBAR RIGHT -->
+<div class="space-y-6">
+
+  <!-- Cadenza di ricontatto -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="phone-call" class="w-4 h-4 text-ink-700"></i> {{ tr('cadence.title') }}</h3>
+      {% if p.next_contact_date and p.next_contact_date <= today %}
+      <span class="b b-rose !text-[10px]">{{ tr('cadence.overdue') }}</span>
+      {% endif %}
+    </div>
+    <div class="p-5">
+      <div class="flex items-center justify-between text-[12.5px] text-ink-600 mb-3">
+        <span>{{ tr('cadence.last_contact') }}</span>
+        <span class="font-mono">{{ p.last_contact_date or tr('cadence.never') }}</span>
+      </div>
+      <form method="post" action="{{ url_for('prospects_cadence', pid=p.id) }}" class="space-y-2.5">
+        <div class="field !mb-0">
+          <label class="label">{{ tr('cadence.next_contact') }}</label>
+          <input name="next_contact_date" type="date" value="{{ p.next_contact_date or '' }}" class="!py-1.5 !text-[12.5px]">
+        </div>
+        <div class="field !mb-0">
+          <label class="label">{{ tr('cadence.cadence_days') }}</label>
+          <input name="contact_cadence_days" type="number" min="1" value="{{ p.contact_cadence_days or '' }}" placeholder="30" class="!py-1.5 !text-[12.5px]">
+          <div class="text-[10.5px] text-ink-400 mt-1 leading-snug">{{ tr('cadence.cadence_hint') }}</div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn-primary btn-sm flex-1 justify-center">{{ tr('cadence.save') }}</button>
+        </div>
+      </form>
+      <form method="post" action="{{ url_for('prospects_contacted', pid=p.id) }}" class="mt-2">
+        <button class="btn-ghost btn-sm w-full justify-center"><i data-lucide="check" class="w-3.5 h-3.5"></i> {{ tr('cadence.contacted_today') }}</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tasks per questo prospect -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="check-square" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.tasks_title') }}</h3>
+      <span class="text-[11px] text-ink-400 font-mono">{{ tasks_p|selectattr('status','equalto','open')|list|length }} {{ tr('pdetail.tasks_open') }}</span>
+    </div>
+    <div class="p-5">
+      <form method="post" action="{{ url_for('tasks') }}" class="mb-3 flex gap-2">
+        <input type="hidden" name="prospect_id" value="{{ p.id }}">
+        <input type="hidden" name="next" value="{{ url_for('prospects_detail', pid=p.id) }}">
+        <input name="title" placeholder="{{ tr('pdetail.task_placeholder') }}" required class="!py-1.5 !text-[12.5px]">
+        <input name="due_date" type="date" class="!w-auto !py-1.5 !text-[12.5px]">
+        <button class="btn-primary btn-sm">+</button>
+      </form>
+      {% if tasks_p %}
+      <div class="space-y-1">
+        {% for t in tasks_p[:8] %}
+        <div class="flex items-start gap-2 py-1">
+          <form method="post" action="{{ url_for('tasks_toggle', tid=t.id) }}">
+            <button type="submit" class="w-4 h-4 rounded border-2 {% if t.status=='done' %}border-emerald-500 bg-emerald-500{% else %}border-ink-300 hover:border-ink-900{% endif %} grid place-items-center mt-0.5">
+              {% if t.status=='done' %}<i data-lucide="check" class="w-2.5 h-2.5 text-white" stroke-width="3"></i>{% endif %}
+            </button>
+          </form>
+          <div class="flex-1 min-w-0">
+            <div class="text-[12.5px] {% if t.status=='done' %}line-through text-ink-400{% endif %} truncate">{{ t.title }}</div>
+            {% if t.due_date %}<div class="text-[10.5px] text-ink-500 font-mono">{{ t.due_date }}</div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-[12px] text-ink-400 text-center py-1">{{ tr('pdetail.tasks_empty') }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Tags -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="tag" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.tags_title') }}</h3>
+    </div>
+    <div class="p-5">
+      {% if prospect_tags %}
+      <div class="flex flex-wrap gap-1.5 mb-3">
+        {% for pt in prospect_tags %}
+        <span class="b b-{{ pt.color or 'slate' }}">
+          {{ pt.name }}
+          <form method="post" action="{{ url_for('prospects_untag', pid=p.id, tid=pt.id) }}" class="inline">
+            <button class="ml-1 text-ink-500 hover:text-rose-700" title="{{ tr('pdetail.remove') }}">×</button>
+          </form>
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <form method="post" action="{{ url_for('prospects_tag', pid=p.id) }}" class="space-y-2">
+        <select name="tag_id" class="!py-1.5 !text-[12.5px]">
+          <option value="">{{ tr('pdetail.tags_existing_option') }}</option>
+          {% for t in all_tags %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        </select>
+        <div class="flex gap-2">
+          <input name="new_tag" placeholder="{{ tr('pdetail.tags_new_placeholder') }}" class="!py-1.5 !text-[12.5px]">
+          <button class="btn-ghost btn-sm">+</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sequence email -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="list-checks" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.sequences_title') }}</h3>
+      <a href="{{ url_for('sequence_new', pid=p.id) }}" class="text-[11px] text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> {{ tr('pdetail.btn_new') }}</a>
+    </div>
+    {% if sequences %}
+    <div class="divide-y divide-ink-100">
+      {% for s in sequences %}
+      <a href="{{ url_for('sequence_detail', seq_id=s.id) }}" class="block px-5 py-3 hover:bg-ink-50">
+        <div class="flex items-center gap-2 mb-1">
+          <div class="font-semibold text-[12.5px] truncate flex-1">{{ s.name }}</div>
+          <span class="b b-slate !text-[10px]">{{ s.goal }}</span>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-ink-500 font-mono">
+          <span>{{ s.steps_n }} {{ tr('pdetail.seq_steps') }} · {{ s.sent_n }} {{ tr('pdetail.seq_sent') }}</span>
+          <span>{{ s.created_at[:10] }}</span>
+        </div>
+        {% if s.steps_n > 0 %}
+        <div class="mt-1.5 progress"><div style="width: {{ (s.sent_n * 100 / s.steps_n)|round|int }}%"></div></div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <a href="{{ url_for('sequence_new', pid=p.id) }}" class="block px-5 py-6 text-center text-[12.5px] text-ink-500 hover:bg-ink-50">
+      {{ tr('pdetail.sequences_empty') }}<br><span class="text-ink-900 font-semibold">{{ tr('pdetail.sequences_empty_cta') }}</span>
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Bozze email -->
+  {% if drafts %}
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="mail" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.drafts_title') }}</h3>
+      <span class="text-[11px] text-ink-400 font-mono">{{ drafts|length }}</span>
+    </div>
+    <div class="divide-y divide-ink-100">
+      {% for d in drafts %}
+      <a href="{{ url_for('draft_detail', did=d.id) }}" class="block px-5 py-3 hover:bg-ink-50">
+        <div class="flex items-center gap-2">
+          <div class="font-semibold text-[12.5px] truncate flex-1">{{ d.subject }}</div>
+          {% if d.sent %}<span class="b b-emerald !text-[10px]"><span class="dot"></span>{{ tr('pdetail.draft_sent') }}</span>{% endif %}
+        </div>
+        <div class="text-[11px] text-ink-500 font-mono mt-0.5">{{ d.created_at[:10] }} · {{ d.purpose }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line"><h3 class="text-[14px] font-semibold">{{ tr('pdetail.quick_summary_title') }}</h3></div>
+    <div class="p-6 space-y-4 text-[13px]">
+      <div>
+        <div class="text-[10px] uppercase tracking-wider font-bold text-ink-500 mb-1.5">{{ tr('pdetail.estimated_net_worth') }}</div>
+        <div class="font-semibold text-ink-900">{{ p.estimated_net_worth or '—' }}</div>
+      </div>
+      <div>
+        <div class="text-[10px] uppercase tracking-wider font-bold text-ink-500 mb-1.5">{{ tr('pdetail.sectors') }}</div>
+        <div class="flex flex-wrap gap-1">
+          {% if p.sectors %}{% for s in p.sectors.split(',') %}<span class="b b-slate">{{ s.strip() }}</span>{% endfor %}{% else %}<span class="text-ink-400">—</span>{% endif %}
+        </div>
+      </div>
+      <div>
+        <div class="text-[10px] uppercase tracking-wider font-bold text-ink-500 mb-1.5">{{ tr('pdetail.source') }}</div>
+        <div class="font-mono text-[12px] text-ink-700">{{ p.source or '—' }}</div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 pt-3 border-t border-line">
+        <div>
+          <div class="text-[10px] uppercase tracking-wider font-bold text-ink-500 mb-1">{{ tr('pdetail.created') }}</div>
+          <div class="font-mono text-[11px] text-ink-700">{{ p.created_at }}</div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase tracking-wider font-bold text-ink-500 mb-1">{{ tr('pdetail.updated') }}</div>
+          <div class="font-mono text-[11px] text-ink-700">{{ p.updated_at }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-line rounded-xl overflow-hidden scroll-mt-[116px]" id="sources">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="link" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.sources_title') }}</h3>
+      <span class="text-[11px] text-ink-400 font-mono">{{ sources|length }}</span>
+    </div>
+    {% if sources %}
+    <div class="px-6 py-3 border-b border-line bg-ink-50 flex flex-wrap items-center gap-2 text-[11.5px]">
+      {% if sources_stats.verified_ok %}<span class="b b-emerald !text-[10px]"><span class="dot"></span>{{ sources_stats.verified_ok }} {{ tr('pdetail.sources_verified') }}</span>{% endif %}
+      {% if sources_stats.verified_restricted %}<span class="b b-amber !text-[10px]"><span class="dot"></span>{{ sources_stats.verified_restricted }} {{ tr('pdetail.sources_restricted') }}</span>{% endif %}
+      {% if sources_stats.verified_ko %}<span class="b b-rose !text-[10px]"><span class="dot"></span>{{ sources_stats.verified_ko }} {{ tr('pdetail.sources_broken') }}</span>{% endif %}
+      {% if sources_stats.unchecked %}<span class="b b-slate !text-[10px]"><span class="dot"></span>{{ sources_stats.unchecked }} {{ tr('pdetail.sources_unchecked') }}</span>{% endif %}
+      {% if sources_stats.grounded_ok %}<span class="b b-emerald !text-[10px]" title="{{ tr('pdetail.sources_grounded_ok_title') }}"><i data-lucide="badge-check" class="w-3 h-3"></i> {{ sources_stats.grounded_ok }} {{ tr('pdetail.sources_confirm') }}</span>{% endif %}
+      {% if sources_stats.grounded_ko %}<span class="b b-rose !text-[10px]" title="{{ tr('pdetail.sources_grounded_ko_title') }}"><i data-lucide="alert-triangle" class="w-3 h-3"></i> {{ sources_stats.grounded_ko }} {{ tr('pdetail.sources_contradict') }}</span>{% endif %}
+      <div class="ml-auto flex items-center gap-2">
+        <form data-busy data-busy-text="{{ tr('pdetail.busy_verifying') }}" method="post" action="{{ url_for('prospects_verify_sources', pid=p.id) }}"
+              onsubmit="const b=this.querySelector('button');b.disabled=true;b.innerHTML='<span class=&quot;spinner&quot;></span> {{ tr('pdetail.busy_verifying') }}';">
+          <button class="btn-ghost btn-sm !py-1 !px-2 !text-[11px]" title="{{ tr('pdetail.verify_links_title') }}">
+            <i data-lucide="shield-check" class="w-3 h-3"></i> {{ tr('pdetail.btn_verify_links') }}
+          </button>
+        </form>
+        <form data-busy data-busy-text="{{ tr('pdetail.busy_reading_sources') }}" method="post" action="{{ url_for('prospects_ground_sources', pid=p.id) }}">
+          <button class="btn-ghost btn-sm !py-1 !px-2 !text-[11px]" title="{{ tr('pdetail.ground_sources_title') }}">
+            <i data-lucide="search-check" class="w-3 h-3"></i> {{ tr('pdetail.btn_verify_content') }}
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+    <div class="p-6 max-h-[380px] overflow-auto">
+      {% if sources %}
+        {% for s in sources %}
+        <div class="py-3 border-b border-dashed border-line last:border-0 last:pb-0 first:pt-0">
+          <div class="flex items-start gap-2">
+            {% if s.verified == 1 %}
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 shrink-0 mt-0.5" title="{{ tr('pdetail.src_verified_title') }} · HTTP {{ s.http_status }}"><i data-lucide="check" class="w-2.5 h-2.5" stroke-width="3"></i></span>
+            {% elif s.verified == 2 %}
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 shrink-0 mt-0.5" title="{{ tr('pdetail.src_restricted_title') }} · {{ s.verification_note or '' }}"><i data-lucide="lock" class="w-2.5 h-2.5" stroke-width="3"></i></span>
+            {% elif s.verified == -1 %}
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-rose-100 text-rose-700 shrink-0 mt-0.5" title="{{ tr('pdetail.src_unreachable_title') }} · {{ s.verification_note or tr('pdetail.error') }}"><i data-lucide="x" class="w-2.5 h-2.5" stroke-width="3"></i></span>
+            {% else %}
+              <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-ink-100 text-ink-400 shrink-0 mt-0.5" title="{{ tr('pdetail.src_unchecked_title') }}"><i data-lucide="circle" class="w-2 h-2"></i></span>
+            {% endif %}
+            <div class="flex-1 min-w-0">
+              <a href="{{ s.url }}" target="_blank" class="font-semibold text-[13px] text-ink-900 hover:text-ink-700 leading-snug {% if s.verified == -1 %}line-through opacity-60{% endif %}">{{ s.title or s.url }}</a>
+              <div class="font-mono text-[11px] text-ink-400 mt-0.5">{{ domain_from(s.url) }}{% if s.http_status %} · HTTP {{ s.http_status }}{% endif %}{% if s.verification_note and s.verified == -1 %} · {{ s.verification_note }}{% endif %}</div>
+              {% if s.grounded == 'supported' %}<div class="text-[11.5px] text-emerald-700 mt-1 leading-snug"><i data-lucide="badge-check" class="w-3 h-3 inline"></i> <span class="font-semibold">{{ tr('pdetail.src_confirms_data') }}</span> {{ s.grounding_note or '' }}</div>
+              {% elif s.grounded == 'contradicted' %}<div class="text-[11.5px] text-rose-700 mt-1 leading-snug"><i data-lucide="alert-triangle" class="w-3 h-3 inline"></i> <span class="font-semibold">{{ tr('pdetail.src_contradicts') }}</span> {{ s.grounding_note or '' }}</div>
+              {% elif s.grounded == 'not_found' %}<div class="text-[11.5px] text-ink-400 mt-1 leading-snug">{{ tr('pdetail.src_not_found') }}</div>{% endif %}
+              {% if s.snippet %}<div class="text-[12px] text-ink-500 mt-1 leading-snug">{{ s.snippet }}</div>{% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-[13px] text-ink-500 text-center py-4">{{ tr('pdetail.sources_empty') }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- NEWS ALERTS -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden scroll-mt-[116px]" id="news">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="newspaper" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.news_title') }}</h3>
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] text-ink-400 font-mono">{{ news|length }}</span>
+        <form data-busy data-busy-text="{{ tr('pdetail.busy_searching_news') }}" method="post" action="{{ url_for('prospects_news_fetch', pid=p.id) }}">
+          <button class="btn-ghost btn-sm !py-1 !px-2 !text-[11px]"><i data-lucide="search" class="w-3 h-3"></i> {{ tr('pdetail.btn_search_news') }}</button>
+        </form>
+      </div>
+    </div>
+    {% set opps = news|selectattr('signal','equalto','opportunity')|list %}
+    {% if opps %}
+    <div class="mx-6 my-3 flex items-start gap-2.5 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
+      <i data-lucide="trending-up" class="w-4 h-4 mt-0.5 shrink-0"></i>
+      <div class="text-[12.5px] leading-snug">
+        <span class="font-semibold">{{ tr('pdetail.news_opportunity_headline') }}</span>
+        {% if opps[0].signal_note %}{{ opps[0].signal_note }}{% else %}{{ opps|length }} {{ tr('pdetail.news_positive_signals') }}{% endif %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="max-h-[420px] overflow-auto">
+      {% if news %}
+        {% for n in news %}
+        <div class="px-6 py-3 border-b border-dashed border-line last:border-0">
+          <div class="flex items-start gap-2">
+            {% if n.sentiment == 'positive' %}
+              <span class="w-2 h-2 rounded-full bg-emerald-500 mt-2 shrink-0" title="{{ tr('pdetail.sentiment_positive') }}"></span>
+            {% elif n.sentiment == 'negative' %}
+              <span class="w-2 h-2 rounded-full bg-rose-500 mt-2 shrink-0" title="{{ tr('pdetail.sentiment_negative') }}"></span>
+            {% else %}
+              <span class="w-2 h-2 rounded-full bg-ink-300 mt-2 shrink-0" title="{{ tr('pdetail.sentiment_neutral') }}"></span>
+            {% endif %}
+            <div class="flex-1 min-w-0">
+              <a href="{{ n.url }}" target="_blank" class="font-semibold text-[13px] text-ink-900 hover:text-ink-700 leading-snug">{{ n.title or n.url }}</a>
+              <div class="text-[11px] text-ink-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                {% if n.publisher %}<span class="font-medium">{{ n.publisher }}</span>{% endif %}
+                {% if n.published_at %}<span class="font-mono text-ink-400">{{ n.published_at }}</span>{% endif %}
+                {% if n.relevance == 'high' %}<span class="b b-amber !text-[10px]">{{ tr('pdetail.news_high_relevance') }}</span>{% endif %}
+                {% if n.signal == 'opportunity' %}<span class="b b-emerald !text-[10px]"><i data-lucide="trending-up" class="w-3 h-3"></i> {{ tr('pdetail.news_signal_opportunity') }}</span>{% elif n.signal == 'risk' %}<span class="b b-rose !text-[10px]"><i data-lucide="alert-triangle" class="w-3 h-3"></i> {{ tr('pdetail.news_signal_risk') }}</span>{% endif %}
+              </div>
+              {% if n.snippet %}<div class="text-[12px] text-ink-600 mt-1 leading-snug">{{ n.snippet }}</div>{% endif %}
+              {% if n.signal_note and n.signal in ('opportunity','risk') %}<div class="text-[11.5px] mt-1 leading-snug {% if n.signal=='opportunity' %}text-emerald-700{% else %}text-rose-700{% endif %}"><span class="font-semibold">{{ tr('pdetail.news_why_matters') }}</span> {{ n.signal_note }}</div>{% endif %}
+            </div>
+            <form method="post" action="{{ url_for('prospects_news_delete', pid=p.id, nid=n.id) }}">
+              <button class="text-ink-300 hover:text-rose-600" title="{{ tr('pdetail.remove') }}"><i data-lucide="x" class="w-3 h-3"></i></button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-[13px] text-ink-500 text-center py-6 px-4">{{ tr('pdetail.news_empty') }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line"><h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="sticky-note" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.internal_notes_title') }}</h3></div>
+    <div class="p-6 text-[13px] text-ink-700 leading-relaxed whitespace-pre-line">
+      {{ p.notes or '—' }}
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ===================== EDIT (SLIDE-OVER) ===================== -->
+<div x-show="edit" x-cloak class="fixed inset-0 z-[65]" style="display:none">
+  <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px]" @click="edit=false" x-show="edit" x-transition.opacity></div>
+  <div class="absolute inset-y-0 right-0 w-full max-w-xl bg-white shadow-2xl flex flex-col"
+       x-show="edit"
+       x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+       x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+       role="dialog" aria-modal="true" aria-label="{{ tr('pdetail.edit_profile_title') }}">
+    <div class="px-6 py-4 border-b border-line flex items-center justify-between gap-3 shrink-0">
+      <div>
+        <h3 class="t-h2 flex items-center gap-2"><i data-lucide="pencil" class="w-4 h-4 text-ink-700"></i> {{ tr('pdetail.edit_profile_title') }}</h3>
+        <p class="text-[12.5px] text-ink-500 mt-0.5">{{ tr('pdetail.edit_profile_subtitle') }}</p>
+      </div>
+      <button type="button" @click="edit=false" class="btn-ghost btn-sm !px-2 tap" aria-label="{{ tr('pdetail.btn_cancel') }}"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+    <form method="post" action="{{ url_for('prospects_edit', pid=p.id) }}" class="p-6 space-y-7 overflow-y-auto flex-1">
+
+    <!-- Identity -->
+    <div class="space-y-4">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 pb-2 border-b border-line">{{ tr('pdetail.section_identity') }}</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="field"><label class="label">{{ tr('pdetail.field_full_name') }} <span class="req">*</span></label><input name="full_name" value="{{ p.full_name }}" required></div>
+        <div class="field"><label class="label">{{ tr('pdetail.field_headline') }}</label><input name="headline" value="{{ p.headline or '' }}" placeholder="{{ tr('pdetail.field_headline_placeholder') }}"></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="field"><label class="label">{{ tr('pdetail.field_company') }}</label><input name="company" value="{{ p.company or '' }}"></div>
+        <div class="field"><label class="label">{{ tr('pdetail.field_role') }}</label><input name="role" value="{{ p.role or '' }}"></div>
+      </div>
+    </div>
+
+    <!-- Contact -->
+    <div class="space-y-4">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 pb-2 border-b border-line">{{ tr('pdetail.section_contacts') }}</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="field"><label class="label">{{ tr('pdetail.field_email') }}</label><input name="email" value="{{ p.email or '' }}"></div>
+        <div class="field"><label class="label">{{ tr('pdetail.field_phone') }}</label><input name="phone" value="{{ p.phone or '' }}"></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="field"><label class="label">{{ tr('pdetail.field_linkedin_url') }}</label><input name="linkedin" value="{{ p.linkedin or '' }}" placeholder="https://linkedin.com/in/..."></div>
+        <div class="field"><label class="label">{{ tr('pdetail.field_twitter') }}</label><input name="twitter" value="{{ p.twitter or '' }}"></div>
+      </div>
+      <div class="field"><label class="label">{{ tr('pdetail.field_website') }}</label><input name="website" value="{{ p.website or '' }}" placeholder="https://..."></div>
+    </div>
+
+    <!-- Geo -->
+    <div class="space-y-4">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 pb-2 border-b border-line">{{ tr('pdetail.section_geography') }}</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="field"><label class="label">{{ tr('pdetail.field_location') }}</label><input name="location" value="{{ p.location or '' }}" placeholder="{{ tr('pdetail.field_location_placeholder') }}"></div>
+        <div class="field"><label class="label">{{ tr('pdetail.field_country') }}</label><input name="country" value="{{ p.country or '' }}"></div>
+      </div>
+    </div>
+
+    <!-- Pipeline -->
+    <div class="space-y-4">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 pb-2 border-b border-line">{{ tr('pdetail.section_pipeline') }}</div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="field"><label class="label">{{ tr('pdetail.field_type') }}</label><select name="type">{% for tk in PROSPECT_TYPES %}<option value="{{ tk }}" {% if p.type==tk %}selected{% endif %}>{{ TYPE_LABELS[tk] }}</option>{% endfor %}</select></div>
+        <div class="field"><label class="label">{{ tr('pdetail.field_stage') }}</label><select name="stage">{% for s in STAGES %}<option value="{{ s }}" {% if p.stage==s %}selected{% endif %}>{{ STAGE_LABELS[s] }}</option>{% endfor %}</select></div>
+        <div class="field"><label class="label">{{ tr('pdetail.field_priority') }}</label><select name="priority"><option value="low" {% if p.priority=='low' %}selected{% endif %}>{{ tr('pdetail.priority_low') }}</option><option value="medium" {% if p.priority=='medium' %}selected{% endif %}>{{ tr('pdetail.priority_medium') }}</option><option value="high" {% if p.priority=='high' %}selected{% endif %}>{{ tr('pdetail.priority_high') }}</option></select></div>
+        <div class="field"><label class="label">{{ tr('pdetail.field_ask_amount') }}</label><input name="ask_amount" type="number" value="{{ p.ask_amount or '' }}" placeholder="2500"></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="field"><label class="label">{{ tr('pdetail.field_estimated_net_worth') }}</label><input name="estimated_net_worth" value="{{ p.estimated_net_worth or '' }}" placeholder="{{ tr('pdetail.field_net_worth_placeholder') }}"></div>
+        <div class="field"><label class="label">{{ tr('pdetail.field_sectors') }}</label><input name="sectors" value="{{ p.sectors or '' }}" placeholder="luxury, retail, moda"></div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="space-y-4">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 pb-2 border-b border-line">{{ tr('pdetail.section_notes') }}</div>
+      <div class="field"><label class="label">{{ tr('pdetail.field_internal_notes') }}</label><textarea name="notes" rows="5" placeholder="{{ tr('pdetail.field_notes_placeholder') }}">{{ p.notes or '' }}</textarea></div>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2 border-t border-line">
+      <button type="button" @click="edit=false" class="btn-ghost">{{ tr('pdetail.btn_cancel') }}</button>
+      <button class="btn-primary"><i data-lucide="check" class="w-4 h-4"></i> {{ tr('pdetail.btn_save') }}</button>
+    </div>
+    </form>
+  </div>
+</div>
+
+</div>{# /x-data wrapper #}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Aggiorna il badge di stato in pagina + toast quando cambio lo stage (no reload)
+  function updateStageBadge(sel){
+    const opt = sel.options[sel.selectedIndex]; if(!opt) return;
+    const badge = document.getElementById('stageBadge');
+    if (badge){ badge.innerHTML = '<span class="b b-'+(opt.dataset.badge||'slate')+'"><span class="dot"></span>'+opt.dataset.label+'</span>'; }
+    if (window.toast) window.toast('{{ tr("pdetail.stage_updated") }}: '+opt.dataset.label, {type:'success'});
+  }
+</script>
+{% endblock %}

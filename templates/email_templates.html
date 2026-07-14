@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Esempi email · Forager{% endblock %}
+{% block content %}
+
+<div class="flex items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-[24px] font-bold tracking-tight text-ink-900">{{ tr('etpl.title') }}</h1>
+    <p class="text-[13px] text-ink-500 mt-1">{{ tr('etpl.subtitle') }}</p>
+  </div>
+  <button onclick="document.getElementById('newForm').scrollIntoView({behavior:'smooth'}); document.querySelector('#newForm input[name=name]').focus();" class="btn-primary btn-sm">
+    <i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('etpl.new') }}
+  </button>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+
+  <!-- LISTA -->
+  <div class="space-y-3">
+    {% if not templates %}
+    <div class="bg-white border border-line rounded-2xl p-10 text-center">
+      <div class="w-12 h-12 rounded-full bg-ink-100 grid place-items-center mx-auto mb-3"><i data-lucide="mail" class="w-5 h-5 text-ink-700"></i></div>
+      <h3 class="font-semibold text-ink-900">{{ tr('etpl.empty_title') }}</h3>
+      <p class="text-[13px] text-ink-500 mt-1 max-w-md mx-auto">{{ tr('etpl.empty_body') }}</p>
+    </div>
+    {% endif %}
+    {% for tpl in templates %}
+    <details class="bg-white border border-line rounded-xl group" {% if loop.first %}open{% endif %}>
+      <summary class="cursor-pointer px-5 py-3 flex items-center gap-3 list-none">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="b b-{% if tpl.category == 'cold_intro' %}indigo{% elif tpl.category == 'ask' %}amber{% elif tpl.category == 'followup' %}cyan{% elif tpl.category == 'thank' %}emerald{% else %}slate{% endif %}">{{ categories.get(tpl.category, tpl.category or 'custom') }}</span>
+            <span class="font-semibold text-[14px] text-ink-900 truncate">{{ tpl.name }}</span>
+          </div>
+          {% if tpl.description %}<div class="text-[12px] text-ink-500 mt-0.5 truncate">{{ tpl.description }}</div>{% endif %}
+        </div>
+        <div class="text-[10.5px] text-ink-400 font-mono whitespace-nowrap">{{ tpl.created_at[:10] }}</div>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-ink-400 transition-transform group-open:rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-5 pt-2 border-t border-line">
+        <form method="post" action="{{ url_for('email_templates_edit', tid=tpl.id) }}" class="space-y-3">
+          <div class="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3">
+            <div class="field"><label class="label">{{ tr('etpl.name') }}</label><input name="name" value="{{ tpl.name }}" required></div>
+            <div class="field"><label class="label">{{ tr('etpl.category') }}</label>
+              <select name="category">
+                {% for k, lbl in categories.items() %}<option value="{{ k }}" {% if tpl.category == k %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="field"><label class="label">{{ tr('etpl.description') }}</label><input name="description" value="{{ tpl.description or '' }}" placeholder="{{ tr('etpl.description_ph') }}"></div>
+          <div class="field"><label class="label">{{ tr('etpl.body') }}</label><textarea name="body" rows="14" required style="font-family:'JetBrains Mono',monospace;font-size:12.5px">{{ tpl.body }}</textarea></div>
+          <div class="flex items-center gap-2 pt-2 border-t border-line">
+            <button class="btn-primary btn-sm"><i data-lucide="save" class="w-3.5 h-3.5"></i> {{ tr('etpl.save') }}</button>
+            <form method="post" action="{{ url_for('email_templates_delete', tid=tpl.id) }}" onsubmit="return confirm('{{ tr('etpl.confirm_delete') }}')" class="ml-auto">
+              <button class="btn-danger"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> {{ tr('etpl.delete') }}</button>
+            </form>
+          </div>
+        </form>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+
+  <!-- NUOVO -->
+  <div>
+    <form method="post" class="bg-white border border-line rounded-2xl p-5 space-y-4 sticky top-20" id="newForm">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="plus-circle" class="w-4 h-4 text-ink-700"></i> {{ tr('etpl.new') }}</h3>
+      <div class="field">
+        <label class="label">{{ tr('etpl.name') }} <span class="req">*</span></label>
+        <input name="name" required placeholder="{{ tr('etpl.name_ph') }}">
+      </div>
+      <div class="field">
+        <label class="label">{{ tr('etpl.category') }}</label>
+        <select name="category">
+          {% for k, lbl in categories.items() %}<option value="{{ k }}">{{ lbl }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">{{ tr('etpl.description') }}</label>
+        <input name="description" placeholder="{{ tr('etpl.description_ph') }}">
+      </div>
+      <div class="field">
+        <label class="label">{{ tr('etpl.body') }} <span class="req">*</span></label>
+        <textarea name="body" rows="14" required style="font-family:'JetBrains Mono',monospace;font-size:12.5px" placeholder="{{ tr('etpl.body_ph') }}"></textarea>
+      </div>
+      <button class="btn-primary w-full justify-center"><i data-lucide="save" class="w-4 h-4"></i> {{ tr('etpl.save_example') }}</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

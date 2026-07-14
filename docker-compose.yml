@@ -1,0 +1,22 @@
+services:
+  forager:
+    build: .
+    container_name: forager
+    restart: unless-stopped
+    ports:
+      # Bind SOLO su localhost: l'app non ha autenticazione, non esporla in LAN.
+      # Per accesso remoto usa un reverse proxy con auth (nginx/caddy) o una VPN.
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      # Override via .env file or qui:
+      FORAGER_SECRET_KEY: ${FORAGER_SECRET_KEY:-change-this-in-production}
+      FORAGER_DEBUG: "0"
+      HUNTER_API_KEY: ${HUNTER_API_KEY:-}
+      HUNTER_SENIORITY: ${HUNTER_SENIORITY:-executive}
+      HUNTER_MAX_PER_DOMAIN: ${HUNTER_MAX_PER_DOMAIN:-25}
+      HUNTER_CACHE_DAYS: ${HUNTER_CACHE_DAYS:-30}
+      # NOTA: Claude CLI non funziona dentro container Docker se non monti
+      # il binary host. Per usare l'AI engine, esegui Forager NATIVAMENTE
+      # (./forager start) invece di Docker.

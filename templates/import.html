@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}Import CSV · Forager{% endblock %}
+{% block content %}
+
+<div class="flex items-end justify-between gap-4 mb-8">
+  <div>
+    <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('import.tools') }}</div>
+    <h1 class="text-[28px] font-bold tracking-tight">{{ tr('import.title') }}</h1>
+    <p class="text-[13.5px] text-ink-500 mt-1">{{ tr('import.subtitle') }}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <form method="post" enctype="multipart/form-data" class="lg:col-span-2 bg-white border border-line rounded-xl p-7 space-y-5">
+
+    <div class="field">
+      <label class="label">{{ tr('import.field_file') }} <span class="req">*</span></label>
+      <input type="file" name="file" accept=".csv" required>
+      <p class="help">{{ tr('import.field_file_help') }}</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="field">
+        <label class="label">{{ tr('import.field_default_type') }}</label>
+        <select name="default_type">
+          <option value="individual">{{ tr('import.opt_individual') }}</option>
+          <option value="corporate">{{ tr('import.opt_corporate') }}</option>
+        </select>
+        <p class="help">{{ tr('import.field_default_type_help') }}</p>
+      </div>
+      <div>
+        <label class="flex items-start gap-3 p-4 rounded-xl border border-line bg-ink-50/40 cursor-pointer hover:bg-ink-50">
+          <input type="checkbox" name="run_ricerca" value="1" class="mt-0.5">
+          <div>
+            <div class="font-semibold text-ink-900 text-[13px]">{{ tr('import.run_each') }}</div>
+            <div class="text-[12px] text-ink-500 mt-0.5">{{ tr('import.run_each_desc') }}</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="bg-ink-50 border border-line rounded-xl p-4">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-ink-700 mb-2">{{ tr('import.headers_title') }}</div>
+      <div class="text-[12.5px] text-ink-600 leading-relaxed">
+        <code class="font-mono">full_name</code> / <code class="font-mono">name</code> / <code class="font-mono">nome</code> <strong>{{ tr('import.required') }}</strong> ·
+        <code class="font-mono">type</code> / <code class="font-mono">tipo</code> (individual|corporate) ·
+        <code class="font-mono">company</code> / <code class="font-mono">azienda</code> ·
+        <code class="font-mono">role</code> / <code class="font-mono">ruolo</code> ·
+        <code class="font-mono">location</code> / <code class="font-mono">città</code> ·
+        <code class="font-mono">country</code> / <code class="font-mono">paese</code> ·
+        <code class="font-mono">email</code> ·
+        <code class="font-mono">linkedin</code> ·
+        <code class="font-mono">website</code> / <code class="font-mono">sito</code> ·
+        <code class="font-mono">notes</code> / <code class="font-mono">note</code>
+      </div>
+    </div>
+
+    <div class="flex justify-end pt-2 border-t border-line">
+      <button class="btn-primary"><i data-lucide="upload-cloud" class="w-4 h-4"></i> {{ tr('import.btn_import') }}</button>
+    </div>
+  </form>
+
+  <div class="space-y-4">
+    <div class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[13px] font-semibold mb-3 flex items-center gap-2"><i data-lucide="lightbulb" class="w-4 h-4 text-ink-700"></i> {{ tr('import.tips') }}</h3>
+      <ul class="text-[12.5px] text-ink-600 space-y-2 leading-relaxed">
+        <li>{{ tr('import.tip_1') }}</li>
+        <li>{{ tr('import.tip_2') }}</li>
+        <li>{{ tr('import.tip_3') }}</li>
+        <li>{{ tr('import.tip_4') }}</li>
+      </ul>
+    </div>
+
+    <div class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[13px] font-semibold mb-2">{{ tr('import.example') }}</h3>
+      <pre class="font-mono text-[11px] bg-ink-50 border border-line rounded-lg p-3 overflow-auto whitespace-pre">full_name,company,role,country
+Diego Della Valle,Tod's SpA,Presidente,Italia
+Generali,,Corporate,Italia
+Brunello Cucinelli,Brunello Cucinelli SpA,Founder,Italia</pre>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

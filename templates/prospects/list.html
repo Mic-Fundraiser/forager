@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import stage_badge, type_badge, priority_badge, score_ring, stars, page_header with context %}
+{% block title %}Prospect · Forager{% endblock %}
+{% block content %}
+
+{% set has_filters = q or ptype or stage %}
+
+{% call page_header(tr('plist.title'), eyebrow=tr('plist.pipeline'), subtitle=stats.total ~ ' ' ~ tr('plist.totali_pipeline_aperta') ~ ' · ' ~ (stats.pipeline|money)) %}
+  <a href="{{ url_for('import_csv') }}" class="btn-ghost btn-sm"><i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">{{ tr('plist.importa_csv') }}</span></a>
+  <a href="{{ url_for('export_csv') }}" class="btn-ghost btn-sm"><i data-lucide="download" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">{{ tr('plist.export') }}</span></a>
+  <a href="{{ url_for('prospects_new') }}" class="btn-primary btn-sm"><i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('plist.nuovo') }}</a>
+{% endcall %}
+
+<!-- QUICK FILTER (preset) -->
+<div class="flex items-center gap-1.5 flex-wrap mb-3">
+  <a href="{{ url_for('prospects_list') }}" class="btn-ghost btn-sm {% if not has_filters %}!bg-ink-900 !text-white !border-ink-900{% endif %}">{{ tr('plist.qf_all') }}</a>
+  <a href="{{ url_for('prospects_list', sort='score') }}" class="btn-ghost btn-sm {% if sort=='score' and not has_filters %}!bg-ink-900 !text-white !border-ink-900{% endif %}"><i data-lucide="flame" class="w-3.5 h-3.5"></i> {{ tr('plist.qf_top') }}</a>
+  {% for s in ['qualified','cultivated','solicited','stewarded'] %}
+  <a href="{{ url_for('prospects_list', stage=s) }}" class="btn-ghost btn-sm {% if stage==s and not q and not ptype %}!bg-ink-900 !text-white !border-ink-900{% endif %}">{{ STAGE_LABELS[s] }}</a>
+  {% endfor %}
+</div>
+
+<!-- FILTRI (i select si applicano al volo) -->
+<form method="get" class="bg-white border border-line rounded-xl p-3 md:p-4 mb-3 grid grid-cols-2 md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2.5 md:gap-3 items-center">
+  <div class="relative col-span-2 md:col-span-1">
+    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none"></i>
+    <label for="plist-q" class="sr-only">{{ tr('plist.cerca_placeholder') }}</label>
+    <input id="plist-q" type="search" name="q" value="{{ q }}" placeholder="{{ tr('plist.cerca_placeholder') }}" class="!pl-9">
+  </div>
+  <select name="type" onchange="this.form.submit()" aria-label="{{ tr('plist.col_tipo') }}">
+    <option value="">{{ tr('plist.tutti_i_tipi') }}</option>
+    {% for tk in PROSPECT_TYPES %}<option value="{{ tk }}" {% if ptype==tk %}selected{% endif %}>{{ TYPE_LABELS[tk] }}</option>{% endfor %}
+  </select>
+  <select name="stage" onchange="this.form.submit()" aria-label="{{ tr('plist.col_stage') }}">
+    <option value="">{{ tr('plist.tutti_gli_stage') }}</option>
+    {% for s in STAGES %}<option value="{{ s }}" {% if stage==s %}selected{% endif %}>{{ STAGE_LABELS[s] }}</option>{% endfor %}
+  </select>
+  <select name="sort" onchange="this.form.submit()" aria-label="{{ tr('plist.sort_priorita') }}">
+    <option value="priority" {% if sort=='priority' %}selected{% endif %}>{{ tr('plist.sort_priorita') }}</option>
+    <option value="score" {% if sort=='score' %}selected{% endif %}>{{ tr('plist.sort_propensity') }}</option>
+    <option value="recent" {% if sort=='recent' %}selected{% endif %}>{{ tr('plist.sort_recenti') }}</option>
+    <option value="name" {% if sort=='name' %}selected{% endif %}>{{ tr('plist.sort_nome') }}</option>
+    <option value="ask" {% if sort=='ask' %}selected{% endif %}>{{ tr('plist.sort_ask') }}</option>
+  </select>
+  <button class="btn-primary btn-sm !justify-center"><i data-lucide="search" class="w-3.5 h-3.5"></i> {{ tr('plist.filtra') }}</button>
+</form>
+
+<!-- Riepilogo risultati + chip filtri rimovibili -->
+<div class="flex items-center flex-wrap gap-2 mb-3 text-[12.5px]">
+  <span class="text-ink-600 font-medium">{{ filtered }} {{ tr('plist.risultati') }}{% if has_filters %} <span class="text-ink-400">· {{ tr('plist.filtered') }}</span>{% endif %}</span>
+  {% if has_filters %}
+  <span class="text-ink-300">·</span>
+  {% if q %}<a href="{{ url_for('prospects_list', type=ptype, stage=stage, sort=sort) }}" class="b b-slate hover:!border-ink-300">“{{ q }}” <span class="text-ink-400">×</span></a>{% endif %}
+  {% if ptype %}<a href="{{ url_for('prospects_list', q=q, stage=stage, sort=sort) }}" class="b b-slate hover:!border-ink-300">{{ TYPE_LABELS[ptype] }} <span class="text-ink-400">×</span></a>{% endif %}
+  {% if stage %}<a href="{{ url_for('prospects_list', q=q, type=ptype, sort=sort) }}" class="b b-slate hover:!border-ink-300">{{ STAGE_LABELS[stage] }} <span class="text-ink-400">×</span></a>{% endif %}
+  <a href="{{ url_for('prospects_list') }}" class="text-ink-500 hover:text-ink-900 underline">{{ tr('plist.clear_filters') }}</a>
+  {% endif %}
+</div>
+
+<form method="post" action="{{ url_for('prospects_bulk') }}" id="bulkform"
+      x-data="{ selected: [], get count(){return this.selected.length} }">
+
+  <!-- Bulk action bar -->
+  <div x-show="count > 0" x-cloak
+       class="sticky top-[60px] z-20 bg-ink-900 text-white rounded-xl px-4 py-3 mb-3 flex items-center gap-3 flex-wrap shadow-lg" role="region" aria-label="{{ tr('plist.selezionati') }}">
+    <span class="text-[13px] font-semibold"><span x-text="count"></span> {{ tr('plist.selezionati') }}</span>
+    <span class="text-ink-500">·</span>
+    <select name="stage" class="!bg-ink-800 !text-white !border-ink-700 !w-auto !text-[12px] !py-1.5" aria-label="{{ tr('plist.cambia_stage') }}">
+      <option value="">{{ tr('plist.cambia_stage') }}</option>
+      {% for s in STAGES %}<option value="{{ s }}">{{ STAGE_LABELS[s] }}</option>{% endfor %}
+    </select>
+    <button name="action" value="stage" class="btn-ghost btn-sm !bg-white !text-ink-900">{{ tr('plist.applica_stage') }}</button>
+
+    <select name="priority" class="!bg-ink-800 !text-white !border-ink-700 !w-auto !text-[12px] !py-1.5" aria-label="{{ tr('plist.priorita_placeholder') }}">
+      <option value="">{{ tr('plist.priorita_placeholder') }}</option>
+      <option value="high">{{ tr('plist.alta') }}</option><option value="medium">{{ tr('plist.media') }}</option><option value="low">{{ tr('plist.bassa') }}</option>
+    </select>
+    <button name="action" value="priority" class="btn-ghost btn-sm !bg-white !text-ink-900">{{ tr('plist.applica_priorita') }}</button>
+
+    <button name="action" value="research" class="btn-ghost btn-sm !bg-white !text-ink-900" data-confirm="{{ tr('plist.confirm_ricerca_bulk') }}">
+      <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> {{ tr('plist.ricerca_bulk') }}
+    </button>
+
+    <button name="action" value="delete" class="btn-ghost btn-sm !bg-rose-600 !text-white !border-rose-600" data-confirm="{{ tr('plist.confirm_elimina') }}" data-confirm-danger data-confirm-label="{{ tr('plist.elimina') }}">
+      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> {{ tr('plist.elimina') }}
+    </button>
+
+    <button type="button" @click="selected = []; document.querySelectorAll('input[name=ids]').forEach(c=>c.checked=false)" class="text-[12px] text-ink-300 hover:text-white ml-auto">{{ tr('plist.deseleziona') }}</button>
+  </div>
+
+  {% if prospects %}
+  <!-- DESKTOP: tabella -->
+  <div class="bg-white border border-line rounded-xl overflow-hidden hidden md:block">
+    <div class="table-wrap"><table class="tbl">
+      <thead>
+        <tr>
+          <th class="!pr-2 !w-[36px]">
+            <input type="checkbox" aria-label="{{ tr('plist.qf_all') }}" @change="
+              if ($event.target.checked) {
+                selected = [...document.querySelectorAll('input[name=ids]')].map(c=>{c.checked=true; return c.value});
+              } else { selected = []; document.querySelectorAll('input[name=ids]').forEach(c=>c.checked=false); }
+            ">
+          </th>
+          <th>{{ tr('plist.col_prospect') }}</th>
+          <th>{{ tr('plist.col_tipo') }}</th>
+          <th>{{ tr('plist.col_location') }}</th>
+          <th>{{ tr('plist.col_stage') }}</th>
+          <th>{{ tr('plist.col_capacity') }}</th>
+          <th class="text-right" title="{{ tr('plist.col_priorita_ai_tip') }}">{{ tr('plist.col_priorita_ai') }}</th>
+          <th class="text-right">{{ tr('plist.col_ask') }}</th>
+          <th>{{ tr('plist.col_priorita') }}</th>
+          <th class="!w-[44px]"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in prospects %}
+          {% set durl = url_for('prospects_detail', pid=p.id) %}
+          <tr class="clickable group">
+            <td class="!pr-2" onclick="event.stopPropagation()">
+              <input type="checkbox" name="ids" value="{{ p.id }}" aria-label="{{ p.full_name }}" @change="$event.target.checked ? selected.push('{{ p.id }}') : selected = selected.filter(x => x !== '{{ p.id }}')">
+            </td>
+            <td onclick="location='{{ durl }}'">
+              <div class="flex items-center gap-3">
+                <img class="av" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}" alt="">
+                <div class="min-w-0">
+                  <a href="{{ durl }}" class="font-semibold text-[13.5px] text-ink-900 truncate block hover:text-ink-700" onclick="event.stopPropagation()">{{ p.full_name }}</a>
+                  <div class="text-ink-500 text-[12px] truncate max-w-[32ch]">{% if p.role %}{{ p.role }}{% if p.company %} · {% endif %}{% endif %}{{ p.company or '' }}</div>
+                </div>
+              </div>
+            </td>
+            <td onclick="location='{{ durl }}'">{{ type_badge(p.type) }}</td>
+            {# location: solo la città, una riga (gli indirizzi completi sgranavano la tabella) #}
+            {% set loc_city = (p.location or '').split(',')[0].strip() %}
+            <td onclick="location='{{ durl }}'" class="text-ink-600 text-[13px] whitespace-nowrap max-w-[16ch] truncate" title="{{ p.location or '' }}">{{ loc_city or '—' }}</td>
+            <td onclick="location='{{ durl }}'">{{ stage_badge(p.stage) }}</td>
+            <td onclick="location='{{ durl }}'">{{ stars(p.capacity_rating, 'text-[14px]') }}</td>
+            <td onclick="location='{{ durl }}'" class="text-right num font-mono text-[14px] font-bold text-ink-900">{{ (p.priority_calc or 0)|round|int }}</td>
+            <td onclick="location='{{ durl }}'" class="text-right num font-mono text-[13px] font-semibold text-ink-900">{{ p.ask_amount|money if p.ask_amount else '—' }}</td>
+            <td onclick="location='{{ durl }}'">{{ priority_badge(p.priority) }}</td>
+            <td onclick="event.stopPropagation()" class="!pl-0">
+              <a href="{{ url_for('compose', pid=p.id) }}" class="text-ink-300 hover:text-ink-900 opacity-0 group-hover:opacity-100 focus:opacity-100 transition tap" title="{{ tr('plist.compose_quick') }}" aria-label="{{ tr('plist.compose_quick') }}"><i data-lucide="sparkles" class="w-4 h-4"></i></a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- MOBILE: card -->
+  <div class="md:hidden space-y-2.5">
+    {% for p in prospects %}
+    {% set durl = url_for('prospects_detail', pid=p.id) %}
+    <a href="{{ durl }}" class="block bg-white border border-line rounded-xl p-3.5 card-hover">
+      <div class="flex items-center gap-3">
+        <img class="av" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}" alt="">
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold text-[14px] text-ink-900 truncate">{{ p.full_name }}</div>
+          <div class="text-ink-500 text-[12px] truncate">{% if p.role %}{{ p.role }}{% if p.company %} · {% endif %}{% endif %}{{ p.company or '' }}{% if p.location %} · {{ p.location }}{% endif %}</div>
+        </div>
+        {{ score_ring(p.propensity_score, 'sm') }}
+      </div>
+      <div class="flex items-center gap-1.5 flex-wrap mt-2.5">
+        {{ type_badge(p.type) }}
+        {{ stage_badge(p.stage) }}
+        {{ priority_badge(p.priority) }}
+        {% if p.ask_amount %}<span class="ml-auto font-mono text-[13px] font-bold text-ink-900">{{ p.ask_amount|money }}</span>{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <!-- EMPTY -->
+  <div class="bg-white border border-line rounded-xl px-6 py-16 text-center">
+    {% if has_filters %}
+      <div class="w-16 h-16 mx-auto mb-5 rounded-2xl bg-ink-50 grid place-items-center text-ink-400 border border-line">
+        <i data-lucide="search-x" class="w-7 h-7"></i>
+      </div>
+      <div class="font-semibold text-ink-900 text-[15px]">{{ tr('plist.empty_title') }}</div>
+      <p class="text-[13px] text-ink-500 mt-1 mb-5">{{ tr('plist.filtered') }} · {{ filtered }} {{ tr('plist.risultati') }}</p>
+      <a href="{{ url_for('prospects_list') }}" class="btn-ghost btn-sm inline-flex"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> {{ tr('plist.clear_filters') }}</a>
+    {% else %}
+      <div class="w-16 h-16 mx-auto mb-5 rounded-2xl bg-ink-50 grid place-items-center text-ink-400 border border-line">
+        <i data-lucide="users" class="w-7 h-7"></i>
+      </div>
+      <div class="font-semibold text-ink-900 text-[15px]">{{ tr('plist.empty_title') }}</div>
+      <p class="text-[13px] text-ink-500 mt-1 mb-5">{{ tr('plist.empty_desc') }}</p>
+      <div class="flex items-center justify-center gap-2 flex-wrap">
+        <a href="{{ url_for('research_index') }}" class="btn-primary btn-sm"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> {{ tr('plist.avvia_ricerca') }}</a>
+        <a href="{{ url_for('import_csv') }}" class="btn-ghost btn-sm"><i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i> {{ tr('plist.importa_csv') }}</a>
+        <a href="{{ url_for('prospects_new') }}" class="btn-ghost btn-sm">{{ tr('plist.aggiungi_manualmente') }}</a>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if total_pages > 1 %}
+  <div class="flex items-center justify-between gap-3 mt-4 text-[13px]">
+    <div class="text-ink-500">
+      {{ tr('plist.pagina') }} <span class="font-semibold text-ink-900">{{ page }}</span> {{ tr('plist.di') }} {{ total_pages }} · {{ filtered }} {{ tr('plist.risultati') }}
+    </div>
+    <div class="flex items-center gap-2">
+      {% if page > 1 %}
+      <a href="{{ url_for('prospects_list', q=q, type=ptype, stage=stage, sort=sort, page=page-1) }}" class="btn-ghost btn-sm"><i data-lucide="chevron-left" class="w-3.5 h-3.5"></i> {{ tr('plist.precedente') }}</a>
+      {% else %}
+      <span class="btn-ghost btn-sm opacity-40 cursor-default"><i data-lucide="chevron-left" class="w-3.5 h-3.5"></i> {{ tr('plist.precedente') }}</span>
+      {% endif %}
+      {% if page < total_pages %}
+      <a href="{{ url_for('prospects_list', q=q, type=ptype, stage=stage, sort=sort, page=page+1) }}" class="btn-ghost btn-sm">{{ tr('plist.successiva') }} <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></a>
+      {% else %}
+      <span class="btn-ghost btn-sm opacity-40 cursor-default">{{ tr('plist.successiva') }} <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</form>
+
+{% endblock %}

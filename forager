@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""Forager CLI — launcher amichevole per fundraiser.
+
+Comandi:
+  forager start       Avvia il server e apre il browser
+  forager init        Setup iniziale (venv + deps + db)
+  forager doctor      Diagnostica configurazione
+  forager backup      Backup database in backups/forager-YYYYMMDD.db
+  forager restore     Ripristina backup
+  forager update      Aggiorna codice (git pull) e dipendenze
+  forager help        Mostra questo aiuto
+"""
+import os
+import shutil
+import subprocess
+import sys
+import time
+import webbrowser
+from datetime import datetime
+from pathlib import Path
+
+ROOT = Path(__file__).parent.resolve()
+VENV = ROOT / ".venv"
+DATA_DIR = ROOT / "data"
+DB_PATH = DATA_DIR / "crm.db"
+BACKUP_DIR = ROOT / "backups"
+
+# ANSI minimal (no deps)
+def C(s, code): return f"\033[{code}m{s}\033[0m"
+def OK(s):   return C("✓ ", "32") + s
+def ERR(s):  return C("✗ ", "31") + s
+def WARN(s): return C("⚠ ", "33") + s
+def INFO(s): return C("→ ", "36") + s
+def BOLD(s): return C(s, "1")
+
+
+def py_bin() -> str:
+    """Path al python del venv (se esiste) o sys.executable."""
+    cand = VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    return str(cand) if cand.exists() else sys.executable
+
+
+def venv_exists() -> bool:
+    return (VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")).exists()
+
+
+def has_claude() -> str | None:
+    return shutil.which("claude")
+
+
+def cmd_init():
+    print(BOLD("\n  Forager · setup iniziale\n"))
+
+    # 1. Python version
+    if sys.version_info < (3, 10):
+        print(ERR(f"Python {sys.version_info.major}.{sys.version_info.minor} trovato — serve Python 3.10+."))
+        sys.exit(1)
+    print(OK(f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"))
+
+    # 2. venv
+    if not venv_exists():
+        print(INFO("Creo virtual environment in .venv …"))
+        subprocess.check_call([sys.executable, "-m", "venv", str(VENV)])
+        print(OK("venv creato"))
+    else:
+        print(OK("venv già esistente"))
+
+    # 3. pip install
+    print(INFO("Installo dipendenze …"))
+    pip = str(VENV / ("Scripts/pip.exe" if os.name == "nt" else "bin/pip"))
+    subprocess.check_call([pip, "install", "-q", "--upgrade", "pip"])
+    subprocess.check_call([pip, "install", "-q", "-r", str(ROOT / "requirements.txt")])
+    print(OK("dipendenze installate"))
+
+    # 4. DB
+    print(INFO("Inizializzo database …"))
+    subprocess.check_call([py_bin(), "-c", "import sys; sys.path.insert(0, '.'); import db; db.init_db()"], cwd=ROOT)
+    print(OK("database pronto"))
+
+    # 5. .env
+    env_file = ROOT / ".env"
+    if not env_file.exists():
+        shutil.copy(ROOT / ".env.example", env_file)
+        print(OK("file .env creato (copia di .env.example)"))
+        print(INFO(f"  Modifica {env_file} se vuoi configurare Hunter.io o altro."))
+    else:
+        print(OK(".env già presente"))
+
+    # 6. claude CLI check
+    claude_path = has_claude()
+    if claude_path:
+        print(OK(f"Claude CLI trovato: {claude_path}"))
+    else:
+        print(WARN("Claude CLI non trovato nel PATH."))
+        print("    Forager USA Claude Code per la ricerca AI. Installalo da:")
+        print("    https://docs.claude.com/claude-code")
+        print("    Il tool funziona anche senza, ma la ricerca OSINT non sarà disponibile.")
+
+    print(BOLD("\n  Setup completato. Lancia ora:\n"))
+    print(f"    {C('./forager start', '36')}\n")
+
+
+def cmd_start():
+    # ensure setup
+    if not venv_exists():
+        print(WARN("venv non trovato. Eseguo prima `forager init` …\n"))
+        cmd_init()
+    if not DB_PATH.exists():
+        subprocess.check_call([py_bin(), "-c", "import sys; sys.path.insert(0, '.'); import db; db.init_db()"], cwd=ROOT)
+
+    # load env to get port
+    port = "5000"
+    env_file = ROOT / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            if line.startswith("FORAGER_PORT"):
+                port = line.split("=", 1)[1].strip().strip('"').strip("'") or "5000"
+                break
+
+    url = f"http://127.0.0.1:{port}"
+    print(BOLD(f"\n  Forager · avvio su {url}\n"))
+
+    # macOS: WeasyPrint (export PDF) needs pango/cairo dynamic libs from Homebrew.
+    # DYLD_* vars are honored by macOS loader only if set before the process starts.
+    env = os.environ.copy()
+    brew_libs = [p for p in ("/opt/homebrew/lib", "/usr/local/lib") if Path(p).is_dir()]
+    if brew_libs and sys.platform == "darwin":
+        existing = env.get("DYLD_FALLBACK_LIBRARY_PATH", "")
+        for p in brew_libs:
+            if p not in existing.split(":"):
+                existing = f"{p}:{existing}" if existing else p
+        env["DYLD_FALLBACK_LIBRARY_PATH"] = existing
+
+    # spawn server
+    proc = subprocess.Popen([py_bin(), str(ROOT / "app.py")], cwd=ROOT, env=env)
+
+    # open browser after a brief delay
+    try:
+        time.sleep(1.5)
+        webbrowser.open(url)
+        proc.wait()
+    except KeyboardInterrupt:
+        print("\n" + INFO("Server fermato."))
+        proc.terminate()
+        proc.wait()
+
+
+def cmd_doctor():
+    print(BOLD("\n  Forager · diagnostica\n"))
+    py = sys.version_info
+    print(("OK " if py >= (3, 10) else "KO ") + f"Python {py.major}.{py.minor}.{py.micro}")
+    print(("OK " if venv_exists() else "KO ") + f"venv ({VENV})")
+    print(("OK " if DB_PATH.exists() else "KO ") + f"Database ({DB_PATH})")
+
+    claude = has_claude()
+    print(("OK " if claude else "KO ") + f"Claude CLI {claude or '(non trovato — installa: https://docs.claude.com/claude-code)'}")
+
+    env_file = ROOT / ".env"
+    print(("OK " if env_file.exists() else "KO ") + f".env ({env_file})")
+
+    if env_file.exists():
+        env_text = env_file.read_text()
+        hunter_ok = "HUNTER_API_KEY=" in env_text and any(
+            l.startswith("HUNTER_API_KEY=") and len(l.split("=", 1)[1].strip().strip("'\"")) > 5
+            for l in env_text.splitlines()
+        )
+        print(("OK " if hunter_ok else "—  ") + f"Hunter.io API key {'configurata' if hunter_ok else 'non configurata (opzionale)'}")
+
+    # try to connect to API
+    if claude:
+        try:
+            out = subprocess.check_output([claude, "--version"], text=True, timeout=5).strip()
+            print("OK " + f"Claude version: {out}")
+        except Exception as e:
+            print("KO " + f"Claude error: {e}")
+    print()
+
+
+def cmd_backup():
+    if not DB_PATH.exists():
+        print(ERR("Nessun database da backuppare."))
+        sys.exit(1)
+    BACKUP_DIR.mkdir(exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dst = BACKUP_DIR / f"forager-{stamp}.db"
+    shutil.copy2(DB_PATH, dst)
+    print(OK(f"Backup creato: {dst}"))
+    print(INFO(f"Per ripristinare: ./forager restore {dst.name}"))
+
+
+def cmd_restore(args):
+    if not args:
+        print(ERR("Specifica il file di backup."))
+        print(INFO("Esempio: ./forager restore forager-20260525-153000.db"))
+        sys.exit(1)
+    src = BACKUP_DIR / args[0]
+    if not src.exists():
+        src = Path(args[0])
+    if not src.exists():
+        print(ERR(f"File non trovato: {args[0]}"))
+        sys.exit(1)
+    print(WARN(f"Sto per sovrascrivere {DB_PATH} con {src}"))
+    if input("  Confermi? (yes/no): ").strip().lower() != "yes":
+        print("Annullato.")
+        sys.exit(0)
+    if DB_PATH.exists():
+        cmd_backup()  # safety backup
+    shutil.copy2(src, DB_PATH)
+    print(OK(f"Database ripristinato da {src}"))
+
+
+def cmd_update():
+    print(BOLD("\n  Forager · aggiornamento\n"))
+    if (ROOT / ".git").exists():
+        print(INFO("git pull …"))
+        try:
+            subprocess.check_call(["git", "pull"], cwd=ROOT)
+            print(OK("codice aggiornato"))
+        except subprocess.CalledProcessError:
+            print(WARN("git pull fallito — controlla manualmente"))
+    else:
+        print(WARN("Non è un repository git. Scarica l'ultima versione manualmente."))
+    pip = str(VENV / ("Scripts/pip.exe" if os.name == "nt" else "bin/pip"))
+    if Path(pip).exists():
+        subprocess.check_call([pip, "install", "-q", "--upgrade", "-r", str(ROOT / "requirements.txt")])
+        print(OK("dipendenze aggiornate"))
+    subprocess.check_call([py_bin(), "-c", "import sys; sys.path.insert(0, '.'); import db; db.init_db()"], cwd=ROOT)
+    print(OK("migrazioni database applicate"))
+
+
+def cmd_help():
+    print(__doc__)
+
+
+def main():
+    args = sys.argv[1:] or ["help"]
+    cmd = args[0]
+    rest = args[1:]
+    mapping = {
+        "start":   cmd_start,
+        "init":    cmd_init,
+        "doctor":  cmd_doctor,
+        "backup":  cmd_backup,
+        "restore": lambda: cmd_restore(rest),
+        "update":  cmd_update,
+        "help":    cmd_help,
+        "-h":      cmd_help,
+        "--help":  cmd_help,
+    }
+    if cmd not in mapping:
+        print(ERR(f"Comando sconosciuto: {cmd}"))
+        cmd_help()
+        sys.exit(1)
+    mapping[cmd]()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,51 @@
+{#
+  Componenti UI riusabili — UNICA fonte di verità per badge, ring, stelle e intestazioni.
+  Importare con contesto per accedere ai globals (STAGE_BADGE, STAGE_LABELS, tr, ...):
+    {% from '_macros.html' import stage_badge, type_badge, priority_badge, level_badge,
+                                  score_ring, stars, page_header, section_open, section_close with context %}
+#}
+
+{# --- Badge di stato del prospect nella pipeline --- #}
+{% macro stage_badge(stage, prefix='') -%}
+<span class="b b-{{ STAGE_BADGE.get(stage, 'slate') }}"><span class="dot"></span>{% if prefix %}{{ prefix }} {% endif %}{{ STAGE_LABELS.get(stage, stage) }}</span>
+{%- endmacro %}
+
+{# --- Badge tipo prospect (major donor / corporate / fondazione) --- #}
+{% macro type_badge(ptype) -%}
+<span class="b b-{{ TYPE_BADGE.get(ptype, 'slate') }}"><span class="dot"></span>{{ TYPE_LABELS.get(ptype, ptype) }}</span>
+{%- endmacro %}
+
+{# --- Badge priorità operativa --- #}
+{% macro priority_badge(prio, prefix='', cls='') -%}
+<span class="b b-{{ PRIORITY_BADGE.get(prio, 'slate') }} {{ cls }}">{% if prefix %}{{ prefix }} {% endif %}{{ PRIORITY_LABELS.get(prio, prio) }}</span>
+{%- endmacro %}
+
+{# --- Badge livello (confidenza/forza dati AI: high/medium/low) --- #}
+{% macro level_badge(level, cls='') -%}
+<span class="b b-{{ LEVEL_BADGE.get(level, 'slate') }} {{ cls }}">{{ tr('level.' ~ level) if level in ('high','medium','low') else (level or '—') }}</span>
+{%- endmacro %}
+
+{# --- Anello punteggio (propensity / affinity 0-100). size: '', 'sm', 'lg' --- #}
+{% macro score_ring(value, size='', extra='') -%}
+<div class="ring-score {{ size }} {{ extra }}" style="--pct: {{ value or 0 }}"><span>{{ value or 0 }}</span></div>
+{%- endmacro %}
+
+{# --- Valutazione a stelle (0-5). cls: '', 'lg' --- #}
+{% macro stars(n, cls='') -%}
+<div class="stars {{ cls }}">{% for i in range(5) %}{% if i < (n or 0) %}★{% else %}<span class="off">★</span>{% endif %}{% endfor %}</div>
+{%- endmacro %}
+
+{#
+  Intestazione di pagina coerente: eyebrow (sezione) + titolo + sottotitolo,
+  con slot azioni a destra via {% call(...) page_header(...) %}…{% endcall %}.
+#}
+{% macro page_header(title, eyebrow='', subtitle='') -%}
+<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 mb-6">
+  <div class="min-w-0">
+    {% if eyebrow %}<div class="t-eyebrow text-ink-500 mb-1">{{ eyebrow }}</div>{% endif %}
+    <h1 class="t-h1">{{ title }}</h1>
+    {% if subtitle %}<p class="text-[13px] text-ink-500 mt-1 leading-relaxed">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if caller %}<div class="flex items-center gap-2 flex-wrap shrink-0">{{ caller() }}</div>{% endif %}
+</div>
+{%- endmacro %}

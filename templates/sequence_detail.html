@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}{{ seq.name }} · {{ tr('seqdet.title') }}{% endblock %}
+{% block content %}
+
+<div class="text-[12px] font-medium text-ink-400 mb-3">
+  <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="hover:text-ink-700">{{ p.full_name }}</a>
+  <span class="text-ink-300 mx-1">/</span>
+  <span class="text-ink-700">{{ tr('seqdet.breadcrumb') }}</span>
+</div>
+
+<div class="flex items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-[26px] font-bold tracking-tight">{{ seq.name }}</h1>
+    <p class="text-[13px] text-ink-500 mt-1">
+      <span class="b b-slate">{{ seq.goal }}</span> · {{ steps|length }} {{ tr('seqdet.step_unit') }} ·
+      {{ tr('seqdet.created') }} <span class="font-mono">{{ seq.created_at[:10] }}</span>
+    </p>
+  </div>
+  <form method="post" action="{{ url_for('sequence_delete', seq_id=seq.id) }}" onsubmit="return confirm('{{ tr('seqdet.confirm_delete') }}')">
+    <button class="btn-danger"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> {{ tr('seqdet.delete') }}</button>
+  </form>
+</div>
+
+<div class="space-y-5">
+  {% for s in steps %}
+  <div class="bg-white border border-line rounded-2xl overflow-hidden" id="step-{{ s.id }}">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line bg-ink-50/40">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-ink-900 text-white grid place-items-center font-bold text-[13px]">{{ s.step_index }}</div>
+        <div>
+          <div class="font-semibold text-[14px]">{{ s.purpose or tr('seqdet.step_fallback') }}</div>
+          <div class="text-[11px] text-ink-500 font-mono">+{{ s.delay_days }} {{ tr('seqdet.days_from_start') }}</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        {% if s.sent %}<span class="b b-emerald"><span class="dot"></span>{{ tr('seqdet.sent') }} {{ s.sent_at[:10] }}</span>{% endif %}
+        {% if not s.sent %}
+        <form method="post" action="{{ url_for('sequence_step_sent', seq_id=seq.id, step_id=s.id) }}">
+          <button class="btn-ghost btn-sm"><i data-lucide="check" class="w-3.5 h-3.5"></i> {{ tr('seqdet.mark_sent') }}</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('sequence_step_edit', seq_id=seq.id, step_id=s.id) }}" class="p-6 space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-[1fr_140px] gap-3">
+        <div class="field"><label class="label">{{ tr('seqdet.subject') }}</label><input name="subject" value="{{ s.subject or '' }}" class="!font-semibold !text-[15px]"></div>
+        <div class="field"><label class="label">{{ tr('seqdet.delay_days') }}</label><input name="delay_days" type="number" value="{{ s.delay_days }}" min="0"></div>
+      </div>
+      <div class="field">
+        <label class="label">{{ tr('seqdet.body') }}</label>
+        <textarea name="body" rows="12" class="!font-mono !text-[13px]">{{ s.body }}</textarea>
+      </div>
+      <div class="flex items-center justify-between pt-2 border-t border-line">
+        {% if p.email or s.subject %}
+        {% set mailto = 'mailto:' + (p.email or '') + '?subject=' + (s.subject or '')|urlencode + '&body=' + (s.body or '')|urlencode %}
+        <a href="{{ mailto }}" class="btn-ghost btn-sm"><i data-lucide="external-link" class="w-3.5 h-3.5"></i> {{ tr('seqdet.open_in_client') }}</a>
+        {% else %}<span></span>{% endif %}
+        <button class="btn-primary btn-sm">{{ tr('seqdet.save_step') }}</button>
+      </div>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Network · {{ p.full_name }}{% endblock %}
+{% block content %}
+
+<div class="text-[12px] font-medium text-ink-400 mb-3">
+  <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="hover:text-ink-700">{{ p.full_name }}</a>
+  <span class="text-ink-300 mx-1">/</span>
+  <span class="text-ink-700">{{ tr('net.network') }}</span>
+</div>
+
+<div class="flex items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-[26px] font-bold tracking-tight">{{ tr('net.network_di') }} {{ p.full_name }}</h1>
+    <p class="text-[13.5px] text-ink-500 mt-1">{{ tr('net.subtitle_pre') }} {{ p.full_name }} {{ tr('net.subtitle_post') }}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="arrow-right-circle" class="w-4 h-4 text-ink-700"></i> {{ tr('net.outgoing') }}</h3>
+      <span class="text-[11px] text-ink-400 font-mono">{{ outgoing|length }}</span>
+    </div>
+    {% if outgoing %}
+    <div class="divide-y divide-ink-100">
+      {% for c in outgoing %}
+      <div class="px-6 py-4">
+        <div class="flex items-center gap-3">
+          {% if c.m_id %}
+            <img class="av" src="{{ avatar_url(c.m_full_name, c.m_photo, c.m_type, domain_from(c.m_website)) }}">
+          {% else %}
+            <div class="av grid place-items-center text-ink-400"><i data-lucide="user" class="w-4 h-4"></i></div>
+          {% endif %}
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-[13.5px] text-ink-900">
+              {% if c.m_id %}<a href="{{ url_for('prospects_detail', pid=c.m_id) }}" class="hover:underline">{{ c.name }}</a><span class="b b-emerald ml-2 !text-[10px]"><span class="dot"></span>{{ tr('net.nel_crm') }}</span>{% else %}{{ c.name }}{% endif %}
+            </div>
+            <div class="text-[12px] text-ink-500 mt-0.5">{{ c.relationship or '—' }}</div>
+            {% if c.context %}<div class="text-[12px] text-ink-600 mt-1">{{ c.context }}</div>{% endif %}
+          </div>
+          <span class="b {% if c.strength=='high' %}b-emerald{% elif c.strength=='low' %}b-rose{% else %}b-amber{% endif %}">{{ c.strength }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<div class="px-6 py-12 text-center text-[13px] text-ink-500">{{ tr('net.empty_outgoing') }}</div>{% endif %}
+  </div>
+
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+      <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="arrow-left-circle" class="w-4 h-4 text-ink-700"></i> {{ tr('net.incoming') }}</h3>
+      <span class="text-[11px] text-ink-400 font-mono">{{ incoming|length }}</span>
+    </div>
+    {% if incoming %}
+    <div class="divide-y divide-ink-100">
+      {% for c in incoming %}
+      <div class="px-6 py-4">
+        <div class="flex items-center gap-3">
+          <img class="av" src="{{ avatar_url(c.s_full_name, c.s_photo, c.s_type, domain_from(c.s_website)) }}">
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-[13.5px] text-ink-900"><a href="{{ url_for('prospects_detail', pid=c.s_id) }}" class="hover:underline">{{ c.s_full_name }}</a></div>
+            <div class="text-[12px] text-ink-500 mt-0.5">{{ tr('net.cita_come') }} <strong>{{ c.relationship or tr('net.connessione') }}</strong></div>
+            {% if c.context %}<div class="text-[12px] text-ink-600 mt-1">{{ c.context }}</div>{% endif %}
+          </div>
+          <span class="b {% if c.strength=='high' %}b-emerald{% elif c.strength=='low' %}b-rose{% else %}b-amber{% endif %}">{{ c.strength }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<div class="px-6 py-12 text-center text-[13px] text-ink-500">{{ tr('net.empty_incoming') }}</div>{% endif %}
+  </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,463 @@
+{% extends 'base.html' %}
+{% block title %}{{ tr('netg.title') }} · Forager{% endblock %}
+{% block content %}
+
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-[24px] font-bold tracking-tight text-ink-900">{{ tr('netg.title') }}</h1>
+    <p class="text-[13px] text-ink-500 mt-1">{{ tr('netg.subtitle') }}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-3 text-[12px] text-ink-600">
+    <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-ink-700"></span> {{ total_prospects }} {{ tr('netg.prospect') }}</span>
+    <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-ink-300"></span> {{ total_entities }} {{ tr('netg.entita_citate') }}</span>
+    <span class="inline-flex items-center gap-1.5">{{ total_edges }} {{ tr('netg.collegamenti') }}</span>
+    <form method="post" action="{{ url_for('network_relink') }}" data-busy data-busy-text="{{ tr('netg.relink_busy') }}"
+          onsubmit="return confirm('{{ tr('netg.relink_confirm') }}')">
+      <button class="btn-ghost btn-sm"><i data-lucide="git-merge" class="w-3.5 h-3.5"></i> {{ tr('netg.relink') }}</button>
+    </form>
+  </div>
+</div>
+
+<div class="bg-white border border-line rounded-2xl overflow-hidden">
+  <div class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-line bg-ink-50">
+    <div class="flex flex-wrap items-center gap-2 text-[12px]">
+      <span class="text-ink-500 font-semibold">{{ tr('netg.filtra') }}</span>
+      <select id="f-type" class="!w-auto !py-1 !text-[12px]">
+        <option value="">{{ tr('netg.tutti_tipi') }}</option>
+        {% for tk in PROSPECT_TYPES %}<option value="{{ tk }}">{{ TYPE_LABELS[tk] }}</option>{% endfor %}
+      </select>
+      <select id="f-stage" class="!w-auto !py-1 !text-[12px]">
+        <option value="">{{ tr('netg.tutti_stage') }}</option>
+        {% for s in STAGES %}<option value="{{ s }}">{{ STAGE_LABELS[s] }}</option>{% endfor %}
+      </select>
+      <input id="f-search" type="search" placeholder="{{ tr('netg.cerca_nome') }}" class="!w-48 !py-1 !text-[12px]">
+      <label class="inline-flex items-center gap-1.5 text-ink-600 cursor-pointer select-none" title="{{ tr('netg.entities_title') }}">
+        <input id="f-entities" type="checkbox" class="!w-3.5 !h-3.5 accent-ink-900"> {{ tr('netg.mostra_enti') }}
+      </label>
+      <label class="inline-flex items-center gap-1.5 text-ink-600 cursor-pointer select-none">
+        <input id="f-connected" type="checkbox" class="!w-3.5 !h-3.5 accent-ink-900"> {{ tr('netg.solo_collegati') }}
+      </label>
+    </div>
+    <div class="lg:ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-500">
+      <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#6366f1"></span>{{ tr('netg.legend_major') }}</span>
+      <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#0891b2"></span>{{ tr('netg.legend_corporate') }}</span>
+      <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#0d9488"></span>{{ tr('netg.legend_foundation') }}</span>
+      <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:#cbd5e1"></span>{{ tr('netg.legend_entity') }}</span>
+    </div>
+  </div>
+
+  <div class="flex flex-col lg:flex-row">
+    <div id="net" class="flex-1 min-w-0"></div>
+
+    <!-- PANNELLO LATERALE: top connettori / dettaglio nodo selezionato -->
+    <aside id="netPanel" class="w-full lg:w-[320px] shrink-0 border-t lg:border-t-0 lg:border-l border-line bg-ink-50/40 overflow-y-auto" style="max-height:74vh">
+
+      <!-- vista default: top connettori -->
+      <div id="panelDefault" class="p-5">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1">{{ tr('netg.top_connectors') }}</div>
+        <p class="text-[12px] text-ink-500 mb-3">{{ tr('netg.top_connectors_desc') }}</p>
+        <div id="topConnectors" class="space-y-1"></div>
+        <p class="text-[11.5px] text-ink-400 mt-5 leading-relaxed border-t border-line pt-3">{{ tr('netg.panel_hint') }}</p>
+      </div>
+
+      <!-- vista selezione: dettaglio nodo -->
+      <div id="panelNode" class="p-5 hidden">
+        <button id="panelBack" class="text-[11.5px] text-ink-400 hover:text-ink-900 mb-3 inline-flex items-center gap-1">
+          <i data-lucide="arrow-left" class="w-3 h-3"></i> {{ tr('netg.top_connectors') }}
+        </button>
+
+        <div class="flex items-center gap-3 mb-1.5">
+          <img id="pnAvatar" class="av !w-11 !h-11" src="" alt="">
+          <div class="min-w-0">
+            <div id="pnName" class="font-semibold text-ink-900 text-[14.5px] leading-tight"></div>
+            <div id="pnMeta" class="text-[11.5px] text-ink-500 mt-0.5"></div>
+          </div>
+        </div>
+
+        <div id="pnScores" class="grid grid-cols-3 gap-2 my-4"></div>
+
+        <div id="pnActions" class="flex gap-2 mb-5">
+          <a id="pnOpen" href="#" class="btn-primary btn-sm flex-1 justify-center">{{ tr('netg.open_profile') }}</a>
+          <a id="pnCompose" href="#" class="btn-ghost btn-sm flex-1 justify-center">{{ tr('netg.compose_email') }}</a>
+        </div>
+
+        <div id="pnEntityHint" class="hidden text-[12.5px] text-ink-600 leading-relaxed mb-4 p-3 rounded-lg bg-white border border-line">
+          {{ tr('netg.entity_panel_hint') }}
+          <a id="pnEntityCreate" href="#" class="block mt-2 font-semibold text-ink-900 underline underline-offset-2">{{ tr('netg.entity_create') }} →</a>
+        </div>
+
+        <!-- percorso warm intro -->
+        <div class="mb-5">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-2">{{ tr('netg.path_title') }}</div>
+          <div id="pnPath" class="text-[12.5px] leading-relaxed"></div>
+        </div>
+
+        <!-- porte d'accesso -->
+        <div>
+          <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-0.5">{{ tr('netg.doors') }}</div>
+          <p class="text-[11.5px] text-ink-400 mb-2">{{ tr('netg.doors_desc') }}</p>
+          <div id="pnDoors" class="space-y-1"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="px-5 py-2 border-t border-line text-[11.5px] text-ink-500 flex flex-wrap gap-4">
+    <span>{{ tr('netg.hint') }}</span>
+    <span id="status" class="ml-auto font-mono"></span>
+  </div>
+</div>
+
+{% if total_edges == 0 and total_prospects > 0 %}
+<div class="mt-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-[12.5px] text-amber-800">
+  {{ tr('netg.empty_pre') }} <strong>{{ tr('netg.empty_affiliazioni') }}</strong>{{ tr('netg.empty_mid1') }} <strong>{{ tr('netg.empty_board') }}</strong> {{ tr('netg.empty_mid2') }} <strong>{{ tr('netg.empty_erogazioni') }}</strong> {{ tr('netg.empty_mid3') }} <strong>{{ tr('netg.relink') }}</strong>.
+</div>
+{% endif %}
+
+<style>
+  /* sfondo: leggero alone radiale + micro-griglia a puntini → profondità, look curato */
+  #net {
+    height: 74vh;
+    background-color: #fbfcfe;
+    background-image:
+      radial-gradient(circle at 50% 32%, #ffffff 0%, rgba(241,245,249,0) 60%),
+      radial-gradient(rgba(148,163,184,0.18) 1px, transparent 1px);
+    background-size: 100% 100%, 22px 22px;
+    background-position: center, center;
+  }
+  #net canvas { outline: none; }
+  @media (max-width: 1023px) { #net { height: 56vh; } #netPanel { max-height: 40vh !important; } }
+  .pn-score { background: white; border: 1px solid var(--line, #e7e5e4); border-radius: 10px; padding: 8px 10px; text-align: center; }
+  .pn-score .v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700; font-size: 15px; color: #18181b; }
+  .pn-score .l { font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: #71717a; margin-top: 2px; }
+  .pn-door { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; font-size: 12.5px; color: #27272a; }
+  .pn-door:hover { background: white; }
+  .pn-door .rel { margin-left: auto; font-size: 10px; color: #a1a1aa; white-space: nowrap; }
+  .pn-door img { width: 22px; height: 22px; border-radius: 999px; }
+  .pn-door .edot { width: 18px; height: 18px; border-radius: 999px; background: #e2e8f0; border: 1px solid #cbd5e1; flex-shrink: 0; }
+  .topc-row { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 10px; cursor: pointer; }
+  .topc-row:hover { background: white; }
+  .topc-row img { width: 26px; height: 26px; border-radius: 999px; }
+  .topc-row .nm { font-size: 13px; font-weight: 600; color: #18181b; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topc-row .deg { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #71717a; white-space: nowrap; }
+  .topc-bar { height: 3px; border-radius: 99px; background: #18181b; }
+  .path-step { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .path-step img { width: 22px; height: 22px; border-radius: 999px; }
+  .path-step .edot { width: 18px; height: 18px; border-radius: 999px; background: #e2e8f0; border: 1px solid #cbd5e1; }
+  .path-arrow { color: #a1a1aa; font-size: 11px; padding-left: 7px; }
+</style>
+<script src="{{ url_for('static', filename='vendor/vis-network.js') }}"></script>
+<script>
+  const RAW_NODES = {{ nodes_json|safe }};
+  const RAW_EDGES = {{ edges_json|safe }};
+
+  const container = document.getElementById('net');
+
+  if (typeof vis === 'undefined') {
+    container.innerHTML = '<div style="display:grid;place-items:center;height:100%;color:#71717a;font-size:13px;text-align:center;padding:24px;">{{ tr("netg.js_lib_error") }}<br>{{ tr("netg.js_lib_error2") }}</div>';
+    throw new Error('vis-network non caricato');
+  }
+  if (!RAW_NODES.length) {
+    container.innerHTML = '<div style="display:grid;place-items:center;height:100%;color:#71717a;font-size:13px;text-align:center;padding:24px;">{{ tr("netg.js_no_prospect") }}<br><a href="/research" style="color:#18181b;text-decoration:underline;margin-top:8px;display:inline-block;">{{ tr("netg.js_start_research") }}</a></div>';
+    throw new Error('nessun nodo');
+  }
+
+  const byId = {};
+  RAW_NODES.forEach(n => byId[n.id] = n);
+
+  // ---- grado (numero di archi) per nodo: guida la DIMENSIONE dei nodi ----
+  const degree = {};
+  RAW_EDGES.forEach(e => { degree[e.from] = (degree[e.from] || 0) + 1; degree[e.to] = (degree[e.to] || 0) + 1; });
+
+  // ---- NODI: avatar circolari (stesse immagini dell'app), bordo colorato per tipo ----
+  const FONT_PROSPECT = { color: '#27272a', size: 13, face: 'Inter', strokeWidth: 4, strokeColor: '#ffffff', vadjust: 4 };
+  const FONT_ENTITY   = { color: '#94a3b8', size: 11, face: 'Inter', strokeWidth: 4, strokeColor: '#ffffff', vadjust: 3 };
+  function nodeSize(n) { return 16 + Math.min(16, (degree[n.id] || 0) * 2.2); }
+  function buildNode(n) {
+    if (n.kind === 'entity') {
+      const f = n.funder;
+      return { id: n.id, label: n.label, title: n.title, shape: 'dot', size: f ? 11 : 6,
+        color: f
+          ? { background: '#99f6e4', border: '#5eead4', highlight: { background: '#5eead4', border: '#0d9488' } }
+          : { background: '#e2e8f0', border: '#cbd5e1', highlight: { background: '#cbd5e1', border: '#64748b' } },
+        font: { ...FONT_ENTITY, color: f ? '#0f766e' : '#94a3b8' } };
+    }
+    return { id: n.id, label: n.label,
+      title: n.title + (n.ext ? `\n+${n.ext} {{ tr("netg.js_ext_contacts") }}` : ''),
+      shape: 'circularImage', image: n.img, brokenImage: undefined,
+      size: nodeSize(n), borderWidth: 3,
+      color: { background: '#ffffff', border: n.color, highlight: { background: '#ffffff', border: '#18181b' } },
+      font: { ...FONT_PROSPECT } };
+  }
+  let nodes = new vis.DataSet(RAW_NODES.map(buildNode));
+
+  // ---- ARCHI: spessore per forza della relazione; dettaglio nel tooltip ----
+  const REL = {
+    connection: { color: '#cbd5e1', dashes: false,  arrow: false },
+    board:      { color: '#a5b4fc', dashes: [3, 4], arrow: true },
+    giving:     { color: '#fbbf24', dashes: false,  arrow: true },
+  };
+  function edgeTitle(e) {
+    if (e.rel === 'board')  return '{{ tr("netg.js_edge_board") }}' + (e.label ? ': ' + e.label : '');
+    if (e.rel === 'giving') return '{{ tr("netg.js_edge_giving") }}';
+    return e.label || '{{ tr("netg.js_edge_connection") }}';
+  }
+  const edgeBase = RAW_EDGES.map(e => {
+    if (e.rel === 'connection') return e.strength === 'high' ? '#34d399' : e.strength === 'low' ? '#fda4af' : '#cbd5e1';
+    return (REL[e.rel] || REL.connection).color;
+  });
+  const edgeW = RAW_EDGES.map(e => e.strength === 'high' ? 2.4 : e.strength === 'low' ? 1 : 1.5);
+  let edges = new vis.DataSet(RAW_EDGES.map((e, i) => {
+    const st = REL[e.rel] || REL.connection;
+    return { id: i, from: e.from, to: e.to, title: edgeTitle(e),
+      color: { color: edgeBase[i], opacity: 0.7, highlight: '#18181b' },
+      width: edgeW[i], dashes: st.dashes,
+      arrows: { to: { enabled: st.arrow, scaleFactor: 0.45 } },
+      smooth: { enabled: true, type: 'dynamic' } };
+  }));
+
+  const data = { nodes: nodes, edges: edges };
+  const options = {
+    autoResize: true,
+    physics: {
+      enabled: true,
+      solver: 'barnesHut',
+      minVelocity: 0.6,
+      stabilization: { enabled: true, iterations: 220, fit: false },
+      barnesHut: { gravitationalConstant: -9000, centralGravity: 0.2, springLength: 210, springConstant: 0.025, damping: 0.72, avoidOverlap: 0.7 },
+    },
+    interaction: { hover: true, tooltipDelay: 140, hideEdgesOnDrag: true, multiselect: false },
+    nodes: {
+      shape: 'dot',
+      scaling: { min: 8, max: 38 },
+      shadow: { enabled: true, color: 'rgba(15,23,42,0.18)', size: 12, x: 0, y: 4 },
+      chosen: { node: (values, id, selected, hovering) => { if (hovering) { values.size *= 1.25; values.shadowSize = 20; } } },
+    },
+    edges: { hoverWidth: 0.8, selectionWidth: 1.2, shadow: false },
+  };
+  const net = new vis.Network(container, data, options);
+  net.once('stabilizationIterationsDone', () => {
+    net.fit({ animation: { duration: 900, easingFunction: 'easeInOutCubic' } });
+  });
+
+  // ---- vicinato: hover → il resto sfuma ----
+  const adjNodes = {};
+  RAW_NODES.forEach(n => { adjNodes[n.id] = new Set([n.id]); });
+  RAW_EDGES.forEach(e => { adjNodes[e.from]?.add(e.to); adjNodes[e.to]?.add(e.from); });
+
+  function focusNode(id) {
+    const near = id == null ? null : adjNodes[id];
+    nodes.update(RAW_NODES.map(n => {
+      const on = !near || near.has(n.id);
+      const baseFont = n.kind === 'entity' ? FONT_ENTITY : FONT_PROSPECT;
+      return { id: n.id, opacity: on ? 1 : 0.13,
+        font: { ...baseFont, color: on ? baseFont.color : 'rgba(100,116,139,0.10)' } };
+    }));
+    edges.update(RAW_EDGES.map((e, i) => {
+      const on = !near || e.from === id || e.to === id;
+      return { id: i, width: on ? Math.max(2, edgeW[i]) : 1,
+        color: { color: on ? edgeBase[i] : '#eef0f2', opacity: on ? 0.95 : 0.2, highlight: '#18181b' } };
+    }));
+  }
+  net.on('hoverNode', p => focusNode(p.node));
+  net.on('blurNode', () => { if (!selectedId) focusNode(null); });
+
+  // =====================================================================
+  //  PANNELLO LATERALE
+  // =====================================================================
+  const panelDefault = document.getElementById('panelDefault');
+  const panelNode = document.getElementById('panelNode');
+  let selectedId = null;
+
+  const T_LINKS = '{{ tr("netg.links_count") }}';
+  function money(v) { if (v == null) return '—'; if (v >= 1e6) return '€ ' + (v/1e6).toFixed(1) + 'M'; if (v >= 1e3) return '€ ' + Math.round(v/1e3) + 'k'; return '€ ' + v; }
+
+  // ---- top connettori (grado più alto) ----
+  const topWrap = document.getElementById('topConnectors');
+  const ranked = RAW_NODES.filter(n => n.kind === 'prospect' && (degree[n.id] || 0) > 0)
+                          .sort((a, b) => (degree[b.id] || 0) - (degree[a.id] || 0)).slice(0, 8);
+  const maxDeg = ranked.length ? (degree[ranked[0].id] || 1) : 1;
+  if (!ranked.length) {
+    topWrap.innerHTML = '<div style="font-size:12px;color:#a1a1aa">{{ tr("netg.doors_none") }}</div>';
+  } else {
+    ranked.forEach(n => {
+      const row = document.createElement('div');
+      row.className = 'topc-row';
+      row.innerHTML = `<img src="${n.img}" alt=""><div style="min-width:0;flex:1"><div class="nm">${n.label}</div>` +
+        `<div class="topc-bar" style="width:${Math.round((degree[n.id]||0)/maxDeg*100)}%"></div></div>` +
+        `<span class="deg">${degree[n.id] || 0} ${T_LINKS}</span>`;
+      row.addEventListener('click', () => selectNode(n.id, true));
+      topWrap.appendChild(row);
+    });
+  }
+
+  // ---- BFS: percorso più corto da una relazione "calda" al nodo selezionato ----
+  const WARM = new Set(['cultivated', 'solicited', 'stewarded']);
+  function warmPathTo(targetId) {
+    const tgt = byId[targetId];
+    if (tgt && tgt.kind === 'prospect' && WARM.has(tgt.stage)) return 'self';
+    const prev = { [targetId]: null };
+    const queue = [targetId];
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const nb of (adjNodes[cur] || [])) {
+        if (nb === cur || nb in prev) continue;
+        prev[nb] = cur;
+        const node = byId[nb];
+        if (node && node.kind === 'prospect' && WARM.has(node.stage)) {
+          const path = [nb];                     // dal nodo caldo...
+          let c = nb;
+          while (prev[c] !== null) { c = prev[c]; path.push(c); }  // ...fino al target
+          return path;
+        }
+        queue.push(nb);
+      }
+    }
+    return null;
+  }
+
+  function nodeChip(n) {
+    if (!n) return '';
+    if (n.kind === 'entity') return `<span class="edot"></span><span>${n.label}</span>`;
+    return `<img src="${n.img}" alt=""><span>${n.label}</span>`;
+  }
+
+  function selectNode(id, center) {
+    selectedId = id;
+    const n = byId[id];
+    if (!n) return;
+    net.selectNodes([id]);
+    focusNode(id);
+    if (center) net.focus(id, { scale: 1.1, animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+
+    panelDefault.classList.add('hidden');
+    panelNode.classList.remove('hidden');
+
+    const isP = n.kind === 'prospect';
+    document.getElementById('pnAvatar').src = isP ? n.img : '';
+    document.getElementById('pnAvatar').style.display = isP ? '' : 'none';
+    document.getElementById('pnName').textContent = n.label;
+    document.getElementById('pnMeta').textContent = isP ? `${n.type_label} · ${n.stage_label}` : '{{ tr("netg.legend_entity") }}';
+    document.getElementById('pnActions').style.display = isP ? '' : 'none';
+    document.getElementById('pnEntityHint').classList.toggle('hidden', isP);
+    document.getElementById('pnScores').style.display = isP ? '' : 'none';
+
+    if (isP) {
+      document.getElementById('pnOpen').href = '/prospects/' + id;
+      document.getElementById('pnCompose').href = '/compose/' + id;
+      document.getElementById('pnScores').innerHTML =
+        `<div class="pn-score"><div class="v">${'★'.repeat(n.capacity || 0) || '—'}</div><div class="l">{{ tr('netg.capacity') }}</div></div>` +
+        `<div class="pn-score"><div class="v">${n.score || 0}</div><div class="l">{{ tr('netg.propensity') }}</div></div>` +
+        `<div class="pn-score"><div class="v">${money(n.ask)}</div><div class="l">{{ tr('netg.ask_lbl') }}</div></div>`;
+    } else {
+      document.getElementById('pnEntityCreate').href = '/prospects/new?name=' + encodeURIComponent(n.label);
+    }
+
+    // percorso warm
+    const pathEl = document.getElementById('pnPath');
+    const path = warmPathTo(id);
+    if (path === 'self') {
+      pathEl.innerHTML = '<span style="color:#047857;font-weight:600">{{ tr("netg.path_self") }}</span>';
+    } else if (path) {
+      pathEl.innerHTML = path.map((pid, i) => {
+        const pn = byId[pid];
+        const arrow = i < path.length - 1 ? '<div class="path-arrow">↓</div>' : '';
+        const tag = i === 0 ? ` <span style="font-size:10px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.05em">{{ tr('netg.you_know') }}</span>` : '';
+        return `<div class="path-step" data-nid="${pid}" style="cursor:pointer">${nodeChip(pn)}${tag}</div>${arrow}`;
+      }).join('');
+      pathEl.querySelectorAll('[data-nid]').forEach(el => el.addEventListener('click', () => {
+        const v = el.dataset.nid; selectNode(isNaN(+v) ? v : +v, true);
+      }));
+    } else {
+      pathEl.innerHTML = '<span style="color:#a1a1aa">{{ tr("netg.path_none") }}</span>';
+    }
+
+    // porte d'accesso (vicini diretti)
+    const doors = document.getElementById('pnDoors');
+    const neigh = [...(adjNodes[id] || [])].filter(x => x !== id);
+    if (!neigh.length) {
+      doors.innerHTML = '<div style="font-size:12px;color:#a1a1aa">{{ tr("netg.doors_none") }}</div>';
+    } else {
+      const rels = {};
+      RAW_EDGES.forEach(e => {
+        if (e.from === id) rels[e.to] = edgeTitle(e);
+        else if (e.to === id) rels[e.from] = edgeTitle(e);
+      });
+      doors.innerHTML = '';
+      neigh.map(x => byId[x]).filter(Boolean)
+        .sort((a, b) => (b.kind === 'prospect') - (a.kind === 'prospect'))
+        .forEach(nb => {
+          const row = document.createElement('div');
+          row.className = 'pn-door';
+          row.innerHTML = nodeChip(nb) + `<span class="rel">${(rels[nb.id] || '').slice(0, 26)}</span>`;
+          row.addEventListener('click', () => selectNode(nb.id, true));
+          doors.appendChild(row);
+        });
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function deselect() {
+    selectedId = null;
+    net.unselectAll();
+    focusNode(null);
+    panelNode.classList.add('hidden');
+    panelDefault.classList.remove('hidden');
+  }
+  document.getElementById('panelBack').addEventListener('click', deselect);
+
+  net.on('click', params => {
+    if (!params.nodes.length) { deselect(); return; }
+    selectNode(params.nodes[0], false);
+  });
+  net.on('doubleClick', params => {
+    if (params.nodes.length && typeof params.nodes[0] === 'number') {
+      window.location.href = '/prospects/' + params.nodes[0];
+    }
+  });
+
+  // =====================================================================
+  //  FILTRI
+  // =====================================================================
+  const fType = document.getElementById('f-type');
+  const fStage = document.getElementById('f-stage');
+  const fSearch = document.getElementById('f-search');
+  const fConnected = document.getElementById('f-connected');
+  const fEntities = document.getElementById('f-entities');
+  const status = document.getElementById('status');
+
+  const connectedIds = new Set();
+  RAW_EDGES.forEach(e => { connectedIds.add(e.from); connectedIds.add(e.to); });
+
+  function applyFilters() {
+    const t = fType.value;
+    const s = fStage.value;
+    const q = (fSearch.value || '').toLowerCase().trim();
+    const onlyConn = fConnected.checked;
+    const showEnt = fEntities.checked;
+    let shownP = 0, shownE = 0;
+    RAW_NODES.forEach(n => {
+      let match;
+      if (n.kind === 'entity') {
+        match = (showEnt || n.funder) && !t && !s
+                && (!q || n.label.toLowerCase().includes(q))
+                && (!onlyConn || connectedIds.has(n.id));
+      } else {
+        match = (!t || n.type === t) && (!s || n.stage === s)
+                && (!q || n.label.toLowerCase().includes(q))
+                && (!onlyConn || connectedIds.has(n.id));
+      }
+      nodes.update({ id: n.id, hidden: !match });
+      if (match) { if (n.kind === 'entity') shownE++; else shownP++; }
+    });
+    status.textContent = `${shownP} {{ tr("netg.js_prospect") }}` + (shownE ? ` · ${shownE} {{ tr("netg.js_entita") }}` : '') + ' {{ tr("netg.js_visibili") }}';
+  }
+  fType.addEventListener('change', applyFilters);
+  fStage.addEventListener('change', applyFilters);
+  fSearch.addEventListener('input', applyFilters);
+  fConnected.addEventListener('change', applyFilters);
+  fEntities.addEventListener('change', applyFilters);
+  applyFilters();
+</script>
+
+{% endblock %}

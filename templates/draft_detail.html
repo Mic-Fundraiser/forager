@@ -1,0 +1,704 @@
+{% extends 'base.html' %}
+{% block title %}Editor · {{ d.subject }}{% endblock %}
+{% block content %}
+
+<div class="text-[12px] font-medium text-ink-400 mb-3">
+  <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="hover:text-ink-700">{{ p.full_name }}</a>
+  <span class="text-ink-300 mx-1">/</span>
+  <span class="text-ink-700">{{ tr('draft.breadcrumb') }}</span>
+</div>
+
+<div class="flex items-end justify-between gap-4 mb-5">
+  <div>
+    <h1 class="text-[24px] font-bold tracking-tight">{{ d.subject or tr('draft.no_subject') }}</h1>
+    <p class="text-[13px] text-ink-500 mt-1">
+      <span class="font-mono">{{ d.created_at[:16] }}</span> ·
+      <span x-data x-text="`${wordCount} {{ tr('draft.words') }} · ${readMinutes} {{ tr('draft.min_read') }}`" id="liveStats">…</span>
+      {% if d.sent %}<span class="b b-emerald ml-2"><span class="dot"></span>{{ tr('draft.sent') }} {{ d.sent_at[:10] }}</span>{% endif %}
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a id="mailtoBtn" href="#" class="btn-primary"><i data-lucide="send" class="w-4 h-4"></i> {{ tr('draft.open_in_client') }}</a>
+    {% if not d.sent %}
+    <form method="post" action="{{ url_for('draft_mark_sent', did=d.id) }}"><button class="btn-ghost"><i data-lucide="check" class="w-3.5 h-3.5"></i> {{ tr('draft.mark_sent') }}</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" id="editorForm">
+<div class="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
+
+  <!-- LEFT: editor -->
+  <div class="space-y-4">
+
+    <!-- Subjects A/B -->
+    <div class="bg-white border border-line rounded-xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-[12px] font-bold uppercase tracking-wider text-ink-500 flex items-center gap-2">
+          <i data-lucide="mail" class="w-3.5 h-3.5"></i> {{ tr('draft.subject') }}
+        </h3>
+        <button type="button" id="genSubjectsBtn" class="text-[12px] font-semibold text-ink-700 hover:text-ink-900 inline-flex items-center gap-1.5">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> {{ tr('draft.gen_5_variants') }}
+        </button>
+      </div>
+      <input name="subject" id="subjectInput" value="{{ d.subject }}" class="!text-[18px] !font-bold !py-3" placeholder="{{ tr('draft.subject_ph') }}">
+      <div id="subjectsList" class="mt-3 space-y-1.5 hidden"></div>
+    </div>
+
+    <!-- Recipient -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label class="label">{{ tr('draft.recipient') }}</label>
+        <input name="contact_name" id="contactName" value="{{ d.contact_name or '' }}">
+      </div>
+      <div>
+        <label class="label">{{ tr('draft.email') }}</label>
+        <input name="contact_email" id="contactEmail" type="email" value="{{ d.contact_email or '' }}">
+      </div>
+    </div>
+
+    <!-- Editor toolbar -->
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="flex items-center gap-1 px-3 py-2 border-b border-line bg-ink-50/50 sticky top-[58px] z-20">
+        <button type="button" data-cmd="bold" class="ed-btn" title="{{ tr('draft.tt_bold') }}"><b>B</b></button>
+        <button type="button" data-cmd="italic" class="ed-btn" title="{{ tr('draft.tt_italic') }}"><i>I</i></button>
+        <button type="button" data-cmd="underline" class="ed-btn" title="{{ tr('draft.tt_underline') }}"><u>U</u></button>
+        <div class="ed-divider"></div>
+        <button type="button" data-cmd="insertUnorderedList" class="ed-btn" title="{{ tr('draft.tt_bullet_list') }}"><i data-lucide="list" class="w-3.5 h-3.5"></i></button>
+        <button type="button" data-cmd="insertOrderedList" class="ed-btn" title="{{ tr('draft.tt_numbered_list') }}"><i data-lucide="list-ordered" class="w-3.5 h-3.5"></i></button>
+        <div class="ed-divider"></div>
+        <button type="button" id="snippetMenuBtn" class="ed-btn" title="{{ tr('draft.tt_snippets') }}"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+        <button type="button" id="continueBtn" class="ed-btn" title="{{ tr('draft.tt_continue') }}"><i data-lucide="play" class="w-3.5 h-3.5"></i> <span class="text-[11px]">{{ tr('draft.continue') }}</span></button>
+        <div class="ml-auto text-[11px] text-ink-500 font-mono pr-2"><kbd>/</kbd> {{ tr('draft.ai_menu') }} · <kbd>⌘K</kbd> {{ tr('draft.actions') }}</div>
+      </div>
+
+      <div id="editor" contenteditable="true" class="editor" data-placeholder="{{ tr('draft.editor_ph') }}"></div>
+      <textarea name="body" id="bodyHidden" style="display:none">{{ d.body }}</textarea>
+
+      <!-- Slash menu -->
+      <div id="slashMenu" class="slash-menu hidden">
+        <div class="slash-section">{{ tr('draft.slash_style') }}</div>
+        <button type="button" data-action="rephrase" class="slash-item"><i data-lucide="wand-2"></i> {{ tr('draft.act_rephrase') }}</button>
+        <button type="button" data-action="shorten" class="slash-item"><i data-lucide="minimize-2"></i> {{ tr('draft.act_shorten') }}</button>
+        <button type="button" data-action="expand" class="slash-item"><i data-lucide="maximize-2"></i> {{ tr('draft.act_expand') }}</button>
+        <button type="button" data-action="fundraiser" class="slash-item"><i data-lucide="sparkles"></i> {{ tr('draft.act_fundraiser') }}</button>
+        <div class="slash-section">{{ tr('draft.slash_tone') }}</div>
+        <button type="button" data-action="warm" class="slash-item"><i data-lucide="heart"></i> {{ tr('draft.act_warmer') }}</button>
+        <button type="button" data-action="formal" class="slash-item"><i data-lucide="briefcase"></i> {{ tr('draft.act_more_formal') }}</button>
+        <button type="button" data-action="direct" class="slash-item"><i data-lucide="zap"></i> {{ tr('draft.act_more_direct') }}</button>
+        <button type="button" data-action="soft" class="slash-item"><i data-lucide="feather"></i> {{ tr('draft.act_softer') }}</button>
+        <button type="button" data-action="intimate" class="slash-item"><i data-lucide="users"></i> {{ tr('draft.act_more_intimate') }}</button>
+        <button type="button" data-action="visionary" class="slash-item"><i data-lucide="telescope"></i> {{ tr('draft.act_more_visionary') }}</button>
+        <div class="slash-section">{{ tr('draft.slash_language') }}</div>
+        <button type="button" data-action="translate_en" class="slash-item"><i data-lucide="languages"></i> {{ tr('draft.act_translate_en') }}</button>
+        <button type="button" data-action="translate_fr" class="slash-item"><i data-lucide="languages"></i> {{ tr('draft.act_translate_fr') }}</button>
+        <div class="slash-section">{{ tr('draft.slash_cleanup') }}</div>
+        <button type="button" data-action="fix_grammar" class="slash-item"><i data-lucide="spell-check"></i> {{ tr('draft.act_fix_grammar') }}</button>
+        <button type="button" data-action="simplify" class="slash-item"><i data-lucide="circle-dashed"></i> {{ tr('draft.act_simplify') }}</button>
+      </div>
+
+      <!-- Bubble menu on selection -->
+      <div id="bubbleMenu" class="bubble-menu hidden">
+        <button type="button" data-action="rephrase" class="bm-btn">{{ tr('draft.act_rephrase') }}</button>
+        <button type="button" data-action="shorten" class="bm-btn">{{ tr('draft.act_shorten') }}</button>
+        <button type="button" data-action="warm" class="bm-btn">{{ tr('draft.bm_warmer') }}</button>
+        <button type="button" data-action="direct" class="bm-btn">{{ tr('draft.bm_direct') }}</button>
+      </div>
+
+      <!-- Snippet menu popover -->
+      <div id="snippetMenu" class="snippet-menu hidden">
+        <div class="snippet-search-wrap">
+          <input type="text" id="snippetSearch" placeholder="{{ tr('draft.snippet_search_ph') }}" class="!text-[12.5px] !py-1.5">
+        </div>
+        <div id="snippetList" class="snippet-list"></div>
+        <div class="snippet-footer">
+          <button type="button" id="saveAsSnippet" class="text-[11px] text-ink-700 hover:text-ink-900 font-semibold inline-flex items-center gap-1.5">
+            <i data-lucide="bookmark-plus" class="w-3.5 h-3.5"></i> {{ tr('draft.save_selection_snippet') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading overlay during AI ops -->
+      <div id="aiLoading" class="ai-loading hidden">
+        <div class="ai-loading-inner">
+          <div class="spinner"></div>
+          <span id="aiLoadingText">{{ tr('draft.ai_rewriting') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between pt-2">
+      <button type="submit" name="delete" value="1" onclick="return confirm('{{ tr('draft.confirm_delete') }}')" class="btn-danger"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> {{ tr('draft.delete') }}</button>
+      <div class="flex items-center gap-3">
+        <span id="autosaveHint" class="text-[11px] text-ink-400"></span>
+        <button type="button" onclick="saveDraft()" class="btn-primary"><i data-lucide="save" class="w-4 h-4"></i> {{ tr('draft.save_changes') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: AI panel + preview -->
+  <div class="space-y-4">
+
+    <div class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[12px] font-bold uppercase tracking-wider text-ink-500 mb-3 flex items-center gap-2"><i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i> {{ tr('draft.live_stats') }}</h3>
+      <div class="grid grid-cols-3 gap-2 text-center mb-3">
+        <div class="bg-ink-50 rounded-lg p-2.5"><div class="text-[10px] font-bold uppercase tracking-wider text-ink-500">{{ tr('draft.stat_words') }}</div><div class="mono font-bold text-[18px] mt-1" id="statWords">0</div></div>
+        <div class="bg-ink-50 rounded-lg p-2.5"><div class="text-[10px] font-bold uppercase tracking-wider text-ink-500">{{ tr('draft.stat_chars') }}</div><div class="mono font-bold text-[18px] mt-1" id="statChars">0</div></div>
+        <div class="bg-ink-50 rounded-lg p-2.5"><div class="text-[10px] font-bold uppercase tracking-wider text-ink-500">{{ tr('draft.stat_reading') }}</div><div class="mono font-bold text-[18px] mt-1"><span id="statMin">0</span><span class="text-ink-400">m</span></div></div>
+      </div>
+    </div>
+
+    <div class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[12px] font-bold uppercase tracking-wider text-ink-500 mb-3 flex items-center gap-2"><i data-lucide="wand-2" class="w-3.5 h-3.5"></i> {{ tr('draft.transform_all') }}</h3>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" onclick="aiAction('rephrase', true)" class="ai-quick">{{ tr('draft.act_rephrase') }}</button>
+        <button type="button" onclick="aiAction('fundraiser', true)" class="ai-quick">{{ tr('draft.q_improve') }}</button>
+        <button type="button" onclick="aiAction('shorten', true)" class="ai-quick">{{ tr('draft.q_shorter') }}</button>
+        <button type="button" onclick="aiAction('expand', true)" class="ai-quick">{{ tr('draft.q_longer') }}</button>
+        <button type="button" onclick="aiAction('warm', true)" class="ai-quick">{{ tr('draft.bm_warmer') }}</button>
+        <button type="button" onclick="aiAction('direct', true)" class="ai-quick">{{ tr('draft.bm_direct') }}</button>
+        <button type="button" onclick="aiAction('formal', true)" class="ai-quick">{{ tr('draft.q_formal') }}</button>
+        <button type="button" onclick="aiAction('visionary', true)" class="ai-quick">{{ tr('draft.q_visionary') }}</button>
+      </div>
+    </div>
+
+    <div class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[12px] font-bold uppercase tracking-wider text-ink-500 mb-3 flex items-center gap-2"><i data-lucide="user" class="w-3.5 h-3.5"></i> {{ tr('draft.prospect') }}</h3>
+      <div class="flex items-center gap-3 mb-3">
+        <img class="av" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}">
+        <div class="min-w-0">
+          <div class="font-semibold text-[13px]">{{ p.full_name }}</div>
+          <div class="text-[12px] text-ink-500 truncate">{{ p.role or '' }}{% if p.role and p.company %} · {% endif %}{{ p.company or '' }}</div>
+        </div>
+      </div>
+      {% if p.ai_summary %}<p class="text-[12px] text-ink-600 leading-relaxed">{{ p.ai_summary[:220] }}{% if p.ai_summary|length > 220 %}…{% endif %}</p>{% endif %}
+      <a href="{{ url_for('prospects_chat', pid=p.id) }}" class="btn-ghost btn-sm w-full justify-center mt-3"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> {{ tr('draft.ask_claude_about') }} {{ p.full_name.split()[0] }}</a>
+    </div>
+
+    <div class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[12px] font-bold uppercase tracking-wider text-ink-500 mb-3 flex items-center gap-2"><i data-lucide="smartphone" class="w-3.5 h-3.5"></i> {{ tr('draft.preview') }}</h3>
+      <div class="mail-preview">
+        <div class="mail-preview-bar">
+          <div class="mail-preview-meta">
+            <div class="font-semibold text-[12px]"><span id="prevContact">{{ d.contact_name or p.full_name }}</span></div>
+            <div class="text-[11px] text-ink-500 mono"><span id="prevEmail">{{ d.contact_email or p.email or '—' }}</span></div>
+          </div>
+        </div>
+        <div class="mail-preview-subject" id="prevSubject">{{ d.subject }}</div>
+        <div class="mail-preview-body" id="prevBody"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</form>
+
+<style>
+.editor {
+  min-height: 380px;
+  padding: 24px 28px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--ink-900);
+  outline: none;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-400);
+  pointer-events: none;
+}
+.editor p { margin: 0 0 1em; }
+.editor p:last-child { margin: 0; }
+.editor ul, .editor ol { margin: 0 0 1em; padding-left: 1.4em; }
+.editor li { margin: .25em 0; }
+.editor a { color: var(--ink-900); text-decoration: underline; text-decoration-color: var(--ink-300); }
+
+.ed-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: transparent; border: none;
+  padding: 6px 9px;
+  border-radius: 6px;
+  font-size: 13px; font-weight: 600;
+  color: var(--ink-600);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.ed-btn:hover { background: white; color: var(--ink-900); }
+.ed-divider { width: 1px; height: 18px; background: var(--ink-200); margin: 0 4px; }
+
+.slash-menu {
+  position: absolute;
+  z-index: 50;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px -8px rgba(0,0,0,.16);
+  padding: 6px;
+  width: 280px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.slash-section { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-400); padding: 6px 8px 4px; }
+.slash-item {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none; background: transparent;
+  border-radius: 6px;
+  font-size: 13px; font-weight: 500;
+  color: var(--ink-800);
+  cursor: pointer;
+  text-align: left;
+}
+.slash-item:hover, .slash-item.active { background: var(--ink-100); }
+.slash-item i, .slash-item svg { width: 14px; height: 14px; color: var(--ink-500); flex-shrink: 0; }
+
+.bubble-menu {
+  position: absolute;
+  z-index: 60;
+  background: var(--ink-900); color: white;
+  border-radius: 8px;
+  padding: 4px;
+  display: flex; gap: 2px;
+  box-shadow: 0 8px 20px -4px rgba(0,0,0,.3);
+}
+.bm-btn { background: transparent; border: none; color: white; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 5px; cursor: pointer; }
+.bm-btn:hover { background: rgba(255,255,255,.12); }
+
+.snippet-menu {
+  position: absolute;
+  z-index: 50;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px -8px rgba(0,0,0,.16);
+  padding: 8px;
+  width: 320px;
+  max-height: 380px;
+  display: flex; flex-direction: column;
+}
+.snippet-search-wrap { padding: 0 4px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.snippet-list { overflow-y: auto; max-height: 260px; }
+.snippet-item {
+  display: block; width: 100%;
+  background: transparent; border: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+.snippet-item:hover { background: var(--ink-100); }
+.snippet-item .name { font-size: 12.5px; font-weight: 600; }
+.snippet-item .preview { font-size: 11px; color: var(--ink-500); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.snippet-item .cat { font-size: 10px; color: var(--ink-400); font-family: 'JetBrains Mono', monospace; }
+.snippet-footer { border-top: 1px solid var(--line); padding-top: 8px; padding-left: 4px; margin-top: 4px; }
+
+.ai-loading {
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,.85);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  display: grid; place-items: center;
+  z-index: 70;
+}
+.ai-loading-inner {
+  display: inline-flex; align-items: center; gap: 12px;
+  background: var(--ink-900); color: white;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 12px 24px -8px rgba(0,0,0,.3);
+}
+.ai-loading-inner .spinner { border-color: white; border-right-color: transparent; }
+
+.ai-quick {
+  background: white;
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px; font-weight: 600;
+  color: var(--ink-700);
+  cursor: pointer;
+  transition: border-color .12s, background .12s, color .12s;
+}
+.ai-quick:hover { border-color: var(--ink-900); background: var(--ink-900); color: white; }
+
+.mail-preview { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: white; }
+.mail-preview-bar { padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--ink-50); }
+.mail-preview-meta { font-size: 11px; }
+.mail-preview-subject { padding: 12px 12px 4px; font-weight: 700; font-size: 13.5px; }
+.mail-preview-body { padding: 4px 12px 16px; font-size: 12.5px; color: var(--ink-700); line-height: 1.55; white-space: pre-wrap; }
+
+.editor [contenteditable] { position: relative; }
+
+.subject-pick {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px;
+  background: var(--ink-50);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; text-align: left;
+  width: 100%;
+  transition: border-color .12s, background .12s;
+}
+.subject-pick:hover { border-color: var(--ink-900); background: white; }
+.subject-pick .ch { width: 18px; text-align: center; font-mono; color: var(--ink-400); flex-shrink: 0; }
+</style>
+
+<script>
+const PROSPECT_ID = {{ p.id }};
+const editor = document.getElementById('editor');
+const bodyHidden = document.getElementById('bodyHidden');
+const subjectInput = document.getElementById('subjectInput');
+const slashMenu = document.getElementById('slashMenu');
+const bubbleMenu = document.getElementById('bubbleMenu');
+const snippetMenu = document.getElementById('snippetMenu');
+const aiLoading = document.getElementById('aiLoading');
+const aiLoadingText = document.getElementById('aiLoadingText');
+const continueBtn = document.getElementById('continueBtn');
+
+// Init editor with body (preserves \n as <br>)
+function plainToHtml(t) {
+  return (t || '').split('\n\n').map(p => '<p>' + (p || '<br>').replace(/\n/g, '<br>') + '</p>').join('');
+}
+function htmlToPlain(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html
+    .replace(/<\/(p|div|li)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<[^>]+>/g, '');
+  return tmp.textContent.replace(/\n{3,}/g, '\n\n').trim();
+}
+editor.innerHTML = plainToHtml({{ d.body|tojson }});
+
+// Live stats + preview
+function updateStats() {
+  const text = editor.innerText;
+  const words = text.split(/\s+/).filter(Boolean).length;
+  const chars = text.length;
+  const min = Math.max(1, Math.round(words / 200));
+  document.getElementById('statWords').textContent = words;
+  document.getElementById('statChars').textContent = chars;
+  document.getElementById('statMin').textContent = min;
+  document.getElementById('prevBody').textContent = text;
+  document.getElementById('prevSubject').textContent = subjectInput.value || '{{ tr("draft.no_subject_paren") }}';
+  document.getElementById('prevContact').textContent = document.getElementById('contactName').value || '—';
+  document.getElementById('prevEmail').textContent = document.getElementById('contactEmail').value || '—';
+  bodyHidden.value = htmlToPlain(editor.innerHTML);
+  updateMailto();
+  if (window._inited) scheduleAutosave();
+}
+function updateMailto() {
+  const email = document.getElementById('contactEmail').value.trim();
+  const subj = subjectInput.value;
+  const body = bodyHidden.value;
+  const btn = document.getElementById('mailtoBtn');
+  if (email) {
+    btn.href = `mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+    btn.classList.remove('opacity-50');
+    btn.title = '{{ tr("draft.mailto_title_ok") }}';
+  } else {
+    btn.href = '#';
+    btn.classList.add('opacity-50');
+    btn.title = '{{ tr("draft.mailto_title_missing") }}';
+  }
+}
+// Senza email il bottone non fa nulla: spiega perché e offri la copia.
+document.getElementById('mailtoBtn').addEventListener('click', (e) => {
+  if (!document.getElementById('contactEmail').value.trim()) {
+    e.preventDefault();
+    const txt = (subjectInput.value ? '{{ tr("draft.subject_prefix") }}' + subjectInput.value + '\n\n' : '') + bodyHidden.value;
+    navigator.clipboard?.writeText(txt).then(
+      () => flashy('{{ tr("draft.flash_no_email_copied") }}'),
+      () => flashy('{{ tr("draft.flash_add_email") }}')
+    );
+  }
+});
+editor.addEventListener('input', updateStats);
+['subjectInput', 'contactName', 'contactEmail'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateStats);
+});
+updateStats();
+window._inited = true;  // da qui in poi updateStats fa scattare l'autosave
+
+// Toolbar formatting
+document.querySelectorAll('[data-cmd]').forEach(btn => {
+  btn.addEventListener('click', e => {
+    document.execCommand(btn.dataset.cmd, false, null);
+    editor.focus();
+  });
+});
+
+// Save draft (silent=true per l'autosave: niente toast, solo l'indicatore)
+async function saveDraft(silent) {
+  const hint = document.getElementById('autosaveHint');
+  if (silent && hint) hint.textContent = '{{ tr("draft.saving") }}';
+  const form = new FormData();
+  form.append('subject', subjectInput.value);
+  form.append('body', bodyHidden.value);
+  form.append('contact_name', document.getElementById('contactName').value);
+  form.append('contact_email', document.getElementById('contactEmail').value);
+  try {
+    const r = await fetch('{{ url_for("draft_detail", did=d.id) }}', { method: 'POST', body: form });
+    if (r.ok) {
+      if (silent) { if (hint) { const ts = new Date().toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'}); hint.textContent = '{{ tr("draft.saved_at") }} ' + ts; } }
+      else flashy('{{ tr("draft.flash_draft_saved") }}');
+      _dirty = false;
+    }
+  } catch (_) {
+    if (hint && silent) hint.textContent = '{{ tr("draft.save_failed") }}';
+  }
+}
+
+// Autosave: salva 2.5s dopo l'ultima modifica (l'editor non perde più il lavoro
+// se chiudi la pagina dopo varie trasformazioni AI).
+let _autosaveTimer = null;
+let _dirty = false;
+function scheduleAutosave() {
+  _dirty = true;
+  const hint = document.getElementById('autosaveHint');
+  if (hint) hint.textContent = '{{ tr("draft.unsaved_changes") }}';
+  clearTimeout(_autosaveTimer);
+  _autosaveTimer = setTimeout(() => saveDraft(true), 2500);
+}
+window.addEventListener('beforeunload', (e) => {
+  if (_dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
+function flashy(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#18181b;color:white;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;z-index:1000;box-shadow:0 12px 24px -8px rgba(0,0,0,.3);opacity:0;transition:opacity .2s';
+  document.body.appendChild(el);
+  setTimeout(() => el.style.opacity = '1', 10);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 250); }, 2400);
+}
+
+// AI Action
+async function aiAction(action, useAllBody) {
+  const sel = window.getSelection();
+  let text;
+  if (useAllBody) {
+    text = bodyHidden.value;
+  } else {
+    text = sel.toString().trim() || bodyHidden.value;
+  }
+  if (!text) return;
+
+  aiLoadingText.textContent = `Claude · ${action}…`;
+  aiLoading.classList.remove('hidden');
+  try {
+    const r = await fetch('/api/ai/edit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, action, prospect_id: PROSPECT_ID }),
+    });
+    const data = await r.json();
+    if (data.ok && data.text) {
+      if (useAllBody || !sel.toString().trim()) {
+        editor.innerHTML = plainToHtml(data.text);
+      } else {
+        // replace selection
+        document.execCommand('insertText', false, data.text);
+      }
+      updateStats();
+      flashy(`✓ ${action} {{ tr("draft.applied") }}`);
+    } else {
+      flashy('{{ tr("draft.error_prefix") }} ' + (data.error || '{{ tr("draft.unknown") }}'));
+    }
+  } catch (e) {
+    flashy('{{ tr("draft.error_prefix") }} ' + e.message);
+  } finally {
+    aiLoading.classList.add('hidden');
+  }
+}
+
+// Slash menu
+let slashOpen = false;
+editor.addEventListener('keyup', (e) => {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const text = sel.anchorNode?.textContent || '';
+  const pos = sel.anchorOffset;
+  const before = text.slice(0, pos);
+  if (before.endsWith('/')) {
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    slashMenu.style.left = (rect.left - editor.getBoundingClientRect().left) + 'px';
+    slashMenu.style.top = (rect.bottom - editor.getBoundingClientRect().top + 6) + 'px';
+    slashMenu.classList.remove('hidden');
+    slashOpen = true;
+  } else if (slashOpen && !before.includes('/')) {
+    slashMenu.classList.add('hidden');
+    slashOpen = false;
+  }
+});
+
+slashMenu.querySelectorAll('[data-action]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const action = btn.dataset.action;
+    // remove the '/' character
+    document.execCommand('undo', false, null);
+    slashMenu.classList.add('hidden');
+    slashOpen = false;
+    // apply to whole paragraph
+    const sel = window.getSelection();
+    const node = sel.anchorNode;
+    if (node && node.nodeType === 3) {
+      const paraText = node.textContent.replace(/\/$/, '');
+      if (paraText.trim()) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        await aiAction(action, false);
+      } else {
+        await aiAction(action, true);
+      }
+    } else {
+      await aiAction(action, true);
+    }
+  });
+});
+
+document.addEventListener('click', (e) => {
+  if (!slashMenu.contains(e.target)) { slashMenu.classList.add('hidden'); slashOpen = false; }
+  if (!snippetMenu.contains(e.target) && e.target.id !== 'snippetMenuBtn') snippetMenu.classList.add('hidden');
+});
+
+// Bubble menu on selection
+editor.addEventListener('mouseup', showBubble);
+editor.addEventListener('keyup', showBubble);
+function showBubble() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) { bubbleMenu.classList.add('hidden'); return; }
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  if (!rect.width) { bubbleMenu.classList.add('hidden'); return; }
+  const editorRect = editor.getBoundingClientRect();
+  bubbleMenu.style.left = (rect.left - editorRect.left + rect.width/2 - 100) + 'px';
+  bubbleMenu.style.top = (rect.top - editorRect.top - 38) + 'px';
+  bubbleMenu.classList.remove('hidden');
+}
+bubbleMenu.querySelectorAll('[data-action]').forEach(btn => {
+  btn.addEventListener('mousedown', e => e.preventDefault());
+  btn.addEventListener('click', () => {
+    bubbleMenu.classList.add('hidden');
+    aiAction(btn.dataset.action, false);
+  });
+});
+
+// Continue writing
+continueBtn.addEventListener('click', async () => {
+  const text = bodyHidden.value;
+  if (!text.trim()) { flashy('{{ tr("draft.flash_write_first") }}'); return; }
+  aiLoadingText.textContent = '{{ tr("draft.ai_continuing") }}';
+  aiLoading.classList.remove('hidden');
+  try {
+    const r = await fetch('/api/ai/continue', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, prospect_id: PROSPECT_ID }),
+    });
+    const data = await r.json();
+    if (data.ok && data.text) {
+      editor.innerHTML = plainToHtml(text + '\n\n' + data.text);
+      updateStats();
+      flashy('✓ {{ tr("draft.flash_continued") }}');
+    } else flashy('{{ tr("draft.error") }}');
+  } finally { aiLoading.classList.add('hidden'); }
+});
+
+// Subjects A/B
+document.getElementById('genSubjectsBtn').addEventListener('click', async () => {
+  const list = document.getElementById('subjectsList');
+  list.innerHTML = '<div class="text-[12px] text-ink-500 py-2 flex items-center gap-2"><span class="spinner"></span> {{ tr("draft.generating_subjects") }}</div>';
+  list.classList.remove('hidden');
+  try {
+    const r = await fetch('/api/ai/subjects', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: bodyHidden.value, n: 5, prospect_id: PROSPECT_ID }),
+    });
+    const data = await r.json();
+    if (data.ok && data.subjects) {
+      list.innerHTML = data.subjects.map((s, i) => `
+        <button type="button" class="subject-pick" data-s="${s.replace(/"/g, '&quot;')}">
+          <span class="ch">${String.fromCharCode(65 + i)}</span><span>${s}</span>
+        </button>`).join('');
+      list.querySelectorAll('[data-s]').forEach(b => {
+        b.addEventListener('click', () => {
+          subjectInput.value = b.dataset.s;
+          updateStats();
+          list.classList.add('hidden');
+          flashy('✓ {{ tr("draft.flash_subject_applied") }}');
+        });
+      });
+    } else list.innerHTML = '<div class="text-rose-600 text-[12px] p-2">{{ tr("draft.error") }}</div>';
+  } catch (e) {
+    list.innerHTML = '<div class="text-rose-600 text-[12px] p-2">{{ tr("draft.error") }}</div>';
+  }
+});
+
+// Snippets
+const snippetBtn = document.getElementById('snippetMenuBtn');
+const snippetList = document.getElementById('snippetList');
+const snippetSearch = document.getElementById('snippetSearch');
+let snippetsCache = [];
+
+async function loadSnippets() {
+  const r = await fetch('/api/snippets');
+  snippetsCache = await r.json();
+  renderSnippets(snippetsCache);
+}
+function renderSnippets(items) {
+  if (!items.length) { snippetList.innerHTML = '<div class="text-[12px] text-ink-400 text-center py-4">{{ tr("draft.no_snippets") }}</div>'; return; }
+  snippetList.innerHTML = items.map(s => `
+    <button type="button" class="snippet-item" data-body="${s.body.replace(/"/g, '&quot;')}">
+      <div class="name">${s.name}</div>
+      <div class="cat">${s.category || ''}</div>
+      <div class="preview">${s.body}</div>
+    </button>`).join('');
+  snippetList.querySelectorAll('[data-body]').forEach(b => {
+    b.addEventListener('click', () => {
+      document.execCommand('insertText', false, b.dataset.body);
+      snippetMenu.classList.add('hidden');
+      updateStats();
+    });
+  });
+}
+snippetSearch.addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  renderSnippets(snippetsCache.filter(s => s.name.toLowerCase().includes(q) || s.body.toLowerCase().includes(q)));
+});
+snippetBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const r = snippetBtn.getBoundingClientRect();
+  const er = editor.getBoundingClientRect();
+  snippetMenu.style.left = (r.left - er.left) + 'px';
+  snippetMenu.style.top = (r.bottom - er.top + 8) + 'px';
+  snippetMenu.classList.toggle('hidden');
+  if (!snippetMenu.classList.contains('hidden')) loadSnippets();
+});
+
+document.getElementById('saveAsSnippet').addEventListener('click', async () => {
+  const sel = window.getSelection().toString().trim();
+  if (!sel) { flashy('{{ tr("draft.flash_select_first") }}'); return; }
+  const name = prompt('{{ tr("draft.prompt_snippet_name") }}');
+  if (!name) return;
+  await fetch('/api/snippets', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, body: sel, category: 'custom' }),
+  });
+  flashy('✓ {{ tr("draft.flash_snippet_saved") }}');
+  loadSnippets();
+});
+
+// Shortcuts
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveDraft(); }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'b') { e.preventDefault(); document.execCommand('bold'); }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'i') { e.preventDefault(); document.execCommand('italic'); }
+});
+</script>
+{% endblock %}

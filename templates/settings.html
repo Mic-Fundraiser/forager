@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% block title %}{{ tr('settings.title') }} · Forager{% endblock %}
+{% block content %}
+
+<div class="mb-8">
+  <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('settings.breadcrumb') }}</div>
+  <h1 class="text-[28px] font-bold tracking-tight">{{ tr('settings.title') }}</h1>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+  <div class="xl:col-span-2 space-y-6">
+
+    <!-- CLAUDE ENGINE -->
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+        <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="sparkles" class="w-4 h-4 text-ink-700"></i> {{ tr('settings.claude_title') }}</h3>
+        <span class="b {% if info.claude_bin %}b-emerald{% else %}b-rose{% endif %}"><span class="dot"></span>{% if info.claude_bin %}{{ tr('settings.connected') }}{% else %}{{ tr('settings.not_found') }}{% endif %}</span>
+      </div>
+      <div class="p-6">
+        <p class="text-[13.5px] text-ink-700 mb-4">{{ tr('settings.claude_info')|safe }}</p>
+        {% if not info.claude_bin %}
+        <div class="flex items-start gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200 mb-4">
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600 mt-0.5 shrink-0"></i>
+          <div class="text-[13px] text-rose-900">
+            {{ tr('settings.claude_install_hint') }}
+            <pre class="font-mono text-[11px] bg-white border border-rose-200 px-3 py-2 rounded-lg overflow-auto mt-2">npm install -g @anthropic-ai/claude-code
+claude   # primo avvio: login</pre>
+            <a href="https://docs.claude.com/claude-code" target="_blank" rel="noopener" class="font-semibold underline underline-offset-2 mt-1 inline-block">{{ tr('settings.claude_install_link') }}</a>
+          </div>
+        </div>
+        {% endif %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1">{{ tr('settings.claude_binary') }}</label>
+            <input value="{{ info.claude_bin or '—' }}" readonly class="font-mono !text-[12px] !text-ink-600 !bg-ink-50">
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1">{{ tr('settings.database') }}</label>
+            <input value="{{ info.db_path }}" readonly class="font-mono !text-[12px] !text-ink-600 !bg-ink-50">
+          </div>
+        </div>
+        <form method="post" action="{{ url_for('settings_save') }}" class="mt-3 flex flex-wrap items-end gap-2 pt-3 border-t border-line">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="flex-1 min-w-[220px]">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1">Percorso CLI Claude (opzionale)</label>
+            <input name="claude_bin" value="{{ claude_bin_cfg }}" spellcheck="false" placeholder="vuoto = rilevamento automatico dal PATH" class="font-mono !text-[12px]">
+          </div>
+          <button class="btn-ghost btn-sm"><i data-lucide="save" class="w-3.5 h-3.5"></i> Salva</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- DATI & BACKUP -->
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+        <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="database-backup" class="w-4 h-4 text-emerald-600"></i> {{ tr('settings.backup_title') }}</h3>
+        <span class="b b-emerald !text-[10px]"><span class="dot"></span>{{ tr('settings.backup_auto') }}</span>
+      </div>
+      <div class="p-6">
+        <p class="text-[13.5px] text-ink-700 mb-4">{{ tr('settings.backup_info')|safe }}</p>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <form method="post" action="{{ url_for('backup_now') }}" data-busy data-busy-text="{{ tr('settings.backup_busy') }}">
+            <button class="btn-primary btn-sm"><i data-lucide="save" class="w-3.5 h-3.5"></i> {{ tr('settings.backup_now') }}</button>
+          </form>
+          <a href="{{ url_for('backup_download') }}" class="btn-ghost btn-sm"><i data-lucide="download" class="w-3.5 h-3.5"></i> {{ tr('settings.backup_download') }}</a>
+        </div>
+        {% if backups %}
+        <div class="border border-line rounded-xl overflow-hidden mb-5">
+          <div class="table-wrap"><table class="tbl">
+            <thead><tr><th>{{ tr('settings.backup_file') }}</th><th class="text-right">{{ tr('settings.backup_size') }}</th></tr></thead>
+            <tbody>
+              {% for b in backups[:6] %}
+              <tr><td class="font-mono text-[12px] text-ink-700">{{ b.name }}</td><td class="text-right font-mono text-[12px] text-ink-500">{{ b.size_kb }} KB</td></tr>
+              {% endfor %}
+            </tbody>
+          </table></div>
+        </div>
+        {% else %}
+        <div class="text-[13px] text-ink-500 mb-5">{{ tr('settings.backup_none') }}</div>
+        {% endif %}
+
+        <div class="border-t border-line pt-4">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1">{{ tr('settings.export_title') }}</div>
+          <p class="text-[12.5px] text-ink-500 mb-3">{{ tr('settings.export_info') }}</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ url_for('export_csv') }}" class="btn-ghost btn-sm"><i data-lucide="users" class="w-3.5 h-3.5"></i> {{ tr('settings.export_prospects') }}</a>
+            <a href="{{ url_for('export_gifts_csv') }}" class="btn-ghost btn-sm"><i data-lucide="heart-handshake" class="w-3.5 h-3.5"></i> {{ tr('settings.export_gifts') }}</a>
+            <a href="{{ url_for('export_full_json') }}" class="btn-ghost btn-sm"><i data-lucide="file-json" class="w-3.5 h-3.5"></i> {{ tr('settings.export_full') }}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HUNTER -->
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+        <h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="at-sign" class="w-4 h-4 text-cyan-600"></i> {{ tr('settings.hunter_title') }}</h3>
+        <span class="b {% if hunter_acc and hunter_acc.ok %}b-emerald{% else %}b-rose{% endif %}"><span class="dot"></span>{% if hunter_acc and hunter_acc.ok %}{{ tr('settings.connected') }}{% else %}{{ tr('settings.hunter_error') }}{% endif %}</span>
+      </div>
+      <div class="p-6">
+        <p class="text-[13.5px] text-ink-700 mb-5">{{ tr('settings.hunter_info', max=hunter_max, days=hunter_cache_days)|safe }}</p>
+
+        <!-- CHIAVE API HUNTER -->
+        <form method="post" action="{{ url_for('settings_save') }}" class="mb-5 p-4 rounded-xl bg-ink-50 border border-line">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-ink-600 mb-1.5">Chiave API Hunter.io</label>
+          <div class="flex flex-wrap gap-2">
+            <input type="password" name="hunter_api_key" autocomplete="off" spellcheck="false"
+                   placeholder="{{ 'chiave configurata — incolla una nuova chiave per sostituirla' if hunter_key_set else 'incolla qui la tua chiave Hunter…' }}"
+                   class="flex-1 min-w-[240px] font-mono !text-[12px]">
+            <button class="btn-primary btn-sm"><i data-lucide="save" class="w-3.5 h-3.5"></i> Salva</button>
+          </div>
+          <p class="text-[12px] text-ink-500 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>Registrati gratis su <a href="https://hunter.io" target="_blank" rel="noopener" class="underline underline-offset-2">hunter.io</a> — 25 ricerche/mese.</span>
+            {% if hunter_key_set %}<label class="inline-flex items-center gap-1.5 text-rose-600 cursor-pointer"><input type="checkbox" name="hunter_remove" value="1" class="!w-auto !inline align-middle"> rimuovi la chiave</label>{% endif %}
+          </p>
+          <div class="grid grid-cols-3 gap-3 mt-3">
+            <div>
+              <label class="block text-[10px] font-semibold uppercase tracking-wider text-ink-500 mb-1">Seniority</label>
+              <input name="hunter_seniority" value="{{ hunter_seniority }}" class="!text-[12px]">
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold uppercase tracking-wider text-ink-500 mb-1">Max / dominio</label>
+              <input name="hunter_max" type="number" min="1" value="{{ hunter_max }}" class="!text-[12px]">
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold uppercase tracking-wider text-ink-500 mb-1">Cache (giorni)</label>
+              <input name="hunter_cache_days" type="number" min="0" value="{{ hunter_cache_days }}" class="!text-[12px]">
+            </div>
+          </div>
+        </form>
+
+        {% if hunter_acc and hunter_acc.ok %}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+          <div class="bg-ink-50 border border-line rounded-xl p-4">
+            <div class="text-[10px] uppercase tracking-wider font-bold text-ink-500">{{ tr('settings.hunter_plan') }}</div>
+            <div class="text-[18px] font-bold tracking-tight mt-2">{{ hunter_acc.plan }}</div>
+            <div class="text-[11px] text-ink-500 mt-1 truncate">{{ hunter_acc.email or '—' }}</div>
+          </div>
+          <div class="bg-ink-50 border border-line rounded-xl p-4">
+            <div class="text-[10px] uppercase tracking-wider font-bold text-ink-500">{{ tr('settings.hunter_searches') }}</div>
+            <div class="text-[18px] font-bold tracking-tight mt-2 font-mono">
+              {{ hunter_acc.searches_used }}<span class="text-ink-400 font-medium"> / {{ hunter_acc.searches_available }}</span>
+            </div>
+            <div class="w-full h-1 bg-ink-200 rounded-full overflow-hidden mt-2">
+              <div class="h-full bg-ink-900 rounded-full" style="width: {{ ((hunter_acc.searches_used or 0) * 100 / (hunter_acc.searches_available or 1))|round }}%"></div>
+            </div>
+            <div class="text-[11px] text-ink-500 mt-1.5">{{ tr('settings.hunter_available', n=(hunter_acc.searches_available or 0) - (hunter_acc.searches_used or 0)) }}</div>
+          </div>
+          <div class="bg-ink-50 border border-line rounded-xl p-4">
+            <div class="text-[10px] uppercase tracking-wider font-bold text-ink-500">{{ tr('settings.hunter_verifications') }}</div>
+            <div class="text-[18px] font-bold tracking-tight mt-2 font-mono">
+              {{ hunter_acc.verifications_used }}<span class="text-ink-400 font-medium"> / {{ hunter_acc.verifications_available }}</span>
+            </div>
+            <div class="w-full h-1 bg-ink-200 rounded-full overflow-hidden mt-2">
+              <div class="h-full bg-cyan-500 rounded-full" style="width: {{ ((hunter_acc.verifications_used or 0) * 100 / (hunter_acc.verifications_available or 1))|round }}%"></div>
+            </div>
+            <div class="text-[11px] text-ink-500 mt-1.5">{{ tr('settings.hunter_reset', d=hunter_acc.reset_date or '—') }}</div>
+          </div>
+        </div>
+        {% else %}
+        <div class="flex items-start gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200 mb-5">
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600 mt-0.5 shrink-0"></i>
+          <div>
+            <div class="text-[11px] font-bold uppercase tracking-wider text-rose-800">{{ tr('settings.hunter_unreachable') }}</div>
+            <div class="text-[13px] text-rose-900 mt-1">{{ hunter_acc.friendly if hunter_acc and hunter_acc.friendly else (hunter_acc.error if hunter_acc else tr('settings.hunter_err_missing')) }}</div>
+            {% if hunter_acc and hunter_acc.friendly and hunter_acc.error and hunter_acc.error != hunter_acc.friendly %}
+            <div class="text-[11px] text-rose-700/70 font-mono mt-1.5">{{ hunter_acc.error }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+          <div class="w-8 h-8 rounded-lg bg-white text-amber-700 grid place-items-center shrink-0"><i data-lucide="shield-alert" class="w-4 h-4"></i></div>
+          <div>
+            <div class="text-[11px] font-bold uppercase tracking-wider text-amber-800">{{ tr('settings.anti_waste_title') }}</div>
+            <ul class="text-[12.5px] text-amber-900 mt-2 space-y-1 leading-relaxed list-disc list-inside">
+              <li>{{ tr('settings.anti_waste_1') }}</li>
+              <li>{{ tr('settings.anti_waste_2')|safe }}</li>
+              <li>{{ tr('settings.anti_waste_3', days=hunter_cache_days)|safe }}</li>
+              <li>{{ tr('settings.anti_waste_4') }}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-line"><h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="lock" class="w-4 h-4 text-ink-700"></i> {{ tr('settings.privacy_title') }}</h3></div>
+      <div class="p-6 text-[13px] text-ink-700">
+        <ul class="space-y-2">
+          <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-600 mt-0.5 shrink-0"></i><span>{{ tr('settings.privacy_1')|safe }}</span></li>
+          <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-600 mt-0.5 shrink-0"></i><span>{{ tr('settings.privacy_2') }}</span></li>
+          <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-600 mt-0.5 shrink-0"></i><span>{{ tr('settings.privacy_3') }}</span></li>
+          <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-600 mt-0.5 shrink-0"></i><span>{{ tr('settings.privacy_4') }}</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-6">
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-line"><h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="keyboard" class="w-4 h-4 text-ink-700"></i> {{ tr('settings.shortcuts_title') }}</h3></div>
+      <div class="p-6 space-y-3 text-[13px]">
+        <div class="flex items-center justify-between"><span class="text-ink-600">{{ tr('settings.shortcut_search') }}</span><kbd>/</kbd></div>
+        <div class="flex items-center justify-between"><span class="text-ink-600">{{ tr('settings.shortcut_new') }}</span><kbd>n</kbd></div>
+        <div class="flex items-center justify-between"><span class="text-ink-600">{{ tr('settings.shortcut_research') }}</span><kbd>r</kbd></div>
+      </div>
+    </div>
+
+    <div class="bg-ink-950 text-white rounded-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-white/10"><h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="sliders-horizontal" class="w-4 h-4 text-cyan-400"></i> Configurazione</h3></div>
+      <div class="p-5 text-[12.5px] text-ink-300 leading-relaxed">
+        <p>Imposti le chiavi qui sopra nel pannello: vengono salvate (e protette) nel file di configurazione personale.</p>
+        <pre class="font-mono text-[11px] text-ink-400 mt-2.5 whitespace-pre-wrap break-all bg-white/5 rounded-lg px-3 py-2">{{ env_path }}</pre>
+      </div>
+    </div>
+
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-line"><h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="bug" class="w-4 h-4 text-ink-700"></i> {{ tr('settings.diag_title') }}</h3></div>
+      <div class="p-6 space-y-3">
+        <div>
+          <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-2">{{ tr('settings.diag_claude') }}</div>
+          <pre class="font-mono text-[11px] bg-ink-50 border border-line px-3 py-2 rounded-lg overflow-auto">claude -p "test" --output-format json</pre>
+        </div>
+        <div>
+          <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-2">{{ tr('settings.diag_hunter') }}</div>
+          <pre class="font-mono text-[11px] bg-ink-50 border border-line px-3 py-2 rounded-lg overflow-auto">curl "https://api.hunter.io/v2/account?api_key=$KEY"</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUTORE -->
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-line"><h3 class="text-[14px] font-semibold flex items-center gap-2"><i data-lucide="user-round" class="w-4 h-4 text-ink-700"></i> Autore</h3></div>
+      <div class="p-6 text-[13px] text-ink-700 space-y-1.5">
+        <div class="font-semibold text-ink-900 text-[14px]">Michelangelo Gigli</div>
+        <div><a href="mailto:info@michelangelogigli.it" class="underline underline-offset-2 hover:text-ink-900">info@michelangelogigli.it</a></div>
+        <div><a href="https://www.linkedin.com/in/gigli-michelangelo/" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 underline underline-offset-2 hover:text-ink-900"><i data-lucide="linkedin" class="w-3.5 h-3.5"></i> LinkedIn</a></div>
+        <div class="text-[12px] text-ink-500 pt-1.5">Open Source · © 2026</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea, select')) return;
+    if (e.key === 'n') location = '{{ url_for("prospects_new") }}';
+    if (e.key === 'r') location = '{{ url_for("research_index") }}';
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+{% block title %}{{ tr('seqnew.title') }} · {{ p.full_name }}{% endblock %}
+{% block content %}
+
+<div class="text-[12px] font-medium text-ink-400 mb-3">
+  <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="hover:text-ink-700">{{ p.full_name }}</a>
+  <span class="text-ink-300 mx-1">/</span>
+  <span class="text-ink-700">{{ tr('seqnew.breadcrumb') }}</span>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+
+  <div class="space-y-4">
+    <div class="bg-white border border-line rounded-2xl p-7">
+      <div class="mb-5">
+        <h1 class="text-[24px] font-bold tracking-tight">{{ tr('seqnew.heading') }}</h1>
+        <p class="text-[13.5px] text-ink-500 mt-1">{{ tr('seqnew.subtitle') }}</p>
+      </div>
+
+      <form id="seqForm" class="space-y-5" onsubmit="startSeq(event)">
+        <div>
+          <label class="label">{{ tr('seqnew.goal_label') }} <span class="req">*</span></label>
+          <select id="goal" required>
+            <option value="cold_outreach">{{ tr('seqnew.goal_cold_outreach') }}</option>
+            <option value="cultivation" selected>{{ tr('seqnew.goal_cultivation') }}</option>
+            <option value="reactivation">{{ tr('seqnew.goal_reactivation') }}</option>
+            <option value="ask">{{ tr('seqnew.goal_ask') }}</option>
+            <option value="thank_steward">{{ tr('seqnew.goal_thank_steward') }}</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="label">{{ tr('seqnew.n_steps_label') }}</label>
+          <div class="flex gap-2">
+            {% for n in [3, 4, 5, 6] %}
+            <label class="flex-1 cursor-pointer">
+              <input type="radio" name="n_steps" value="{{ n }}" {% if n == 4 %}checked{% endif %} class="peer sr-only">
+              <div class="border border-line rounded-lg p-3 text-center font-semibold text-[13px] hover:border-ink-700 peer-checked:bg-ink-900 peer-checked:text-white peer-checked:border-ink-900 transition">
+                {{ n }} {{ tr('seqnew.step_unit') }}
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-line">
+          <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="btn-ghost btn-sm">← {{ tr('seqnew.back') }}</a>
+          <button id="btnStart" type="submit" class="btn-primary"><i data-lucide="sparkles" class="w-4 h-4"></i> {{ tr('seqnew.generate') }}</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Loading panel -->
+    <div id="loadingPanel" class="bg-white border border-line rounded-2xl p-8 hidden">
+      <div class="flex items-start gap-4">
+        <div class="w-10 h-10 rounded-full bg-ink-900 grid place-items-center shrink-0">
+          <span class="spinner" style="color:white"></span>
+        </div>
+        <div class="flex-1">
+          <h3 class="font-semibold text-[15px]">{{ tr('seqnew.loading_title') }}</h3>
+          <p class="text-[13px] text-ink-500 mt-1" id="loadingStatus">{{ tr('seqnew.loading_status_initial') }}</p>
+          <div class="mt-4 progress"><div id="loadingBar" style="width:5%; transition: width .6s"></div></div>
+          <div class="mt-4 text-[12px] text-ink-500" id="loadingTimer">⏱ 0s</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sequence esistenti -->
+    {% if existing %}
+    <div class="bg-white border border-line rounded-2xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-line">
+        <h3 class="text-[13px] font-semibold flex items-center gap-2"><i data-lucide="list-checks" class="w-4 h-4 text-ink-700"></i> {{ tr('seqnew.existing_title') }}</h3>
+      </div>
+      <div class="divide-y divide-ink-100">
+        {% for s in existing %}
+        <a href="{{ url_for('sequence_detail', seq_id=s.id) }}" class="block px-5 py-3 hover:bg-ink-50">
+          <div class="flex items-center gap-3">
+            <div class="font-semibold text-[13px] flex-1">{{ s.name }}</div>
+            <span class="b b-slate !text-[10px]">{{ s.goal }}</span>
+            <span class="text-[11px] text-ink-400 font-mono">{{ s.n }} {{ tr('seqnew.step_unit') }}</span>
+            <span class="text-[11px] text-ink-400 font-mono">{{ s.created_at[:10] }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- SIDEBAR PROSPECT -->
+  <div class="space-y-4">
+    <div class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[13px] font-semibold mb-3 flex items-center gap-2"><i data-lucide="user" class="w-4 h-4 text-ink-700"></i> {{ tr('seqnew.prospect') }}</h3>
+      <div class="flex items-center gap-3 mb-3">
+        <img class="av" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}">
+        <div class="min-w-0">
+          <div class="font-semibold text-[13px] truncate">{{ p.full_name }}</div>
+          <div class="text-[12px] text-ink-500 truncate">{{ p.role or '' }}{% if p.role and p.company %} · {% endif %}{{ p.company or '' }}</div>
+        </div>
+      </div>
+      {% if p.ai_summary %}<p class="text-[12px] text-ink-600 leading-relaxed">{{ p.ai_summary[:280] }}{% if p.ai_summary|length > 280 %}…{% endif %}</p>{% endif %}
+    </div>
+
+    <div class="bg-ink-50 border border-line rounded-xl p-4 text-[12.5px] text-ink-700 leading-relaxed">
+      <div class="flex items-start gap-2">
+        <i data-lucide="info" class="w-4 h-4 text-ink-500 mt-0.5 shrink-0"></i>
+        <div>
+          <strong>{{ tr('seqnew.tip_label') }}</strong> · {{ tr('seqnew.tip_body') }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROSPECT_ID = {{ p.id }};
+const $ = (id) => document.getElementById(id);
+let pollTimer = null;
+let timerStart = 0;
+let tickTimer = null;
+let estimatedSeconds = 0;
+
+async function startSeq(e) {
+  e.preventDefault();
+  const goal = $('goal').value;
+  const nStepsEl = document.querySelector('input[name=n_steps]:checked');
+  const n_steps = parseInt(nStepsEl ? nStepsEl.value : '4', 10);
+  estimatedSeconds = Math.max(60, n_steps * 30);  // ~30s per step
+
+  $('seqForm').style.display = 'none';
+  $('loadingPanel').classList.remove('hidden');
+  timerStart = Date.now();
+  tickTimer = setInterval(updateLoading, 1000);
+  updateLoading();
+
+  try {
+    const r = await fetch('/api/sequences/' + PROSPECT_ID + '/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal, n_steps }),
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || 'errore');
+    pollJob(data.job_id);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+function updateLoading() {
+  const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+  $('loadingTimer').textContent = '⏱ ' + elapsed + 's';
+  const pct = Math.min(95, 5 + (elapsed / estimatedSeconds) * 90);
+  $('loadingBar').style.width = pct + '%';
+  if (elapsed < 20) $('loadingStatus').textContent = '{{ tr("seqnew.loading_status_starting") }}';
+  else if (elapsed < 60) $('loadingStatus').textContent = '{{ tr("seqnew.loading_status_first") }}';
+  else if (elapsed < 120) $('loadingStatus').textContent = '{{ tr("seqnew.loading_status_continue") }}';
+  else $('loadingStatus').textContent = '{{ tr("seqnew.loading_status_almost") }}';
+}
+
+async function pollJob(jobId) {
+  pollTimer = setInterval(async () => {
+    try {
+      const r = await fetch('/api/sequences/job/' + jobId);
+      const d = await r.json();
+      if (!d.ok) return;
+      if (d.status === 'done' && d.url) {
+        clearInterval(pollTimer); clearInterval(tickTimer);
+        $('loadingBar').style.width = '100%';
+        $('loadingStatus').textContent = '{{ tr("seqnew.loading_status_done") }}';
+        setTimeout(() => { window.location.href = d.url; }, 500);
+      } else if (d.status === 'error') {
+        clearInterval(pollTimer); clearInterval(tickTimer);
+        showError(d.error || '{{ tr("seqnew.error_generation") }}');
+      }
+    } catch (e) {
+      console.error('Poll error:', e);
+    }
+  }, 3000);
+}
+
+function showError(msg) {
+  if (pollTimer) clearInterval(pollTimer);
+  if (tickTimer) clearInterval(tickTimer);
+  $('loadingPanel').innerHTML = `
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-full bg-rose-50 border border-rose-200 grid place-items-center shrink-0 text-rose-700">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+      </div>
+      <div class="flex-1">
+        <h3 class="font-semibold text-[15px] text-rose-900">{{ tr('seqnew.error_title') }}</h3>
+        <p class="text-[13px] text-ink-700 mt-1">${msg.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</p>
+        <button onclick="location.reload()" class="btn-primary btn-sm mt-3"><i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> {{ tr('seqnew.retry') }}</button>
+      </div>
+    </div>`;
+  lucide.createIcons();
+}
+</script>
+
+{% endblock %}

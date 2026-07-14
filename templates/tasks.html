@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import priority_badge, page_header with context %}
+{% block title %}{{ tr('tasks.title') }} · Forager{% endblock %}
+{% block content %}
+
+{% call page_header(tr('tasks.heading'), eyebrow=tr('tasks.workspace'), subtitle=tr('tasks.subtitle') ~ ' · ' ~ (overdue|length + today_t|length + upcoming|length) ~ ' ' ~ tr('tasks.open')) %}
+  <details class="relative">
+    <summary class="btn-primary btn-sm list-none cursor-pointer">
+      <i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('tasks.new_task') }}
+    </summary>
+    <form method="post" class="absolute right-0 mt-2 w-[420px] bg-white border border-line rounded-xl shadow-lg p-4 space-y-3 z-30">
+      <div class="field"><label class="label">{{ tr('tasks.field_title') }} <span class="req">*</span></label><input name="title" required autofocus placeholder="{{ tr('tasks.title_placeholder') }}"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="field"><label class="label">{{ tr('tasks.field_due') }}</label><input name="due_date" type="date"></div>
+        <div class="field"><label class="label">{{ tr('tasks.field_priority') }}</label><select name="priority"><option value="low">{{ tr('tasks.priority_low') }}</option><option value="medium" selected>{{ tr('tasks.priority_medium') }}</option><option value="high">{{ tr('tasks.priority_high') }}</option></select></div>
+      </div>
+      <div class="field"><label class="label">{{ tr('tasks.field_prospect') }}</label>
+        <select name="prospect_id">
+          <option value="">{{ tr('tasks.none') }}</option>
+          {% for pp in all_prospects %}<option value="{{ pp.id }}">{{ pp.full_name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label class="label">{{ tr('tasks.field_notes') }}</label><textarea name="body" rows="3"></textarea></div>
+      <div class="flex justify-end gap-2"><button class="btn-primary btn-sm">{{ tr('tasks.create_task') }}</button></div>
+    </form>
+  </details>
+{% endcall %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+  <div class="bg-white border border-line rounded-xl p-5">
+    <div class="text-[11px] font-bold uppercase tracking-wider text-rose-600">{{ tr('tasks.overdue') }}</div>
+    <div class="mt-2 text-[28px] font-bold tracking-tight font-mono">{{ overdue|length }}</div>
+  </div>
+  <div class="bg-white border border-line rounded-xl p-5">
+    <div class="text-[11px] font-bold uppercase tracking-wider text-ink-700">{{ tr('tasks.today') }}</div>
+    <div class="mt-2 text-[28px] font-bold tracking-tight font-mono">{{ today_t|length }}</div>
+  </div>
+  <div class="bg-white border border-line rounded-xl p-5">
+    <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500">{{ tr('tasks.upcoming') }}</div>
+    <div class="mt-2 text-[28px] font-bold tracking-tight font-mono">{{ upcoming|length }}</div>
+  </div>
+</div>
+
+{% macro tasklist(items, label, kind='normal') %}
+  <div class="bg-white border border-line rounded-xl mb-4 overflow-hidden">
+    <div class="px-5 py-3 border-b border-line flex items-center justify-between">
+      <h3 class="text-[13px] font-semibold flex items-center gap-2">
+        {% if kind=='overdue' %}<span class="w-2 h-2 rounded-full bg-rose-500"></span>{% elif kind=='today' %}<span class="w-2 h-2 rounded-full bg-amber-500"></span>{% elif kind=='no_date' %}<span class="w-2 h-2 rounded-full bg-ink-400"></span>{% elif kind=='done' %}<span class="w-2 h-2 rounded-full bg-emerald-500"></span>{% else %}<span class="w-2 h-2 rounded-full bg-blue-500"></span>{% endif %}
+        {{ label }}
+      </h3>
+      <span class="text-[11px] text-ink-400 font-mono">{{ items|length }}</span>
+    </div>
+    <div class="divide-y divide-ink-100">
+      {% for task in items %}
+      <div class="px-5 py-3 flex items-center gap-3 hover:bg-ink-50 group">
+        <form method="post" action="{{ url_for('tasks_toggle', tid=task.id) }}">
+          <button type="submit" class="w-5 h-5 rounded-md border-2 {% if task.status=='done' %}border-emerald-500 bg-emerald-500{% else %}border-ink-300 hover:border-ink-900{% endif %} grid place-items-center" title="{{ tr('tasks.mark_done') }}">
+            {% if task.status=='done' %}<i data-lucide="check" class="w-3 h-3 text-white" stroke-width="3"></i>{% endif %}
+          </button>
+        </form>
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-ink-900 text-[13.5px] {% if task.status=='done' %}line-through text-ink-400{% endif %} truncate">{{ task.title }}</div>
+          <div class="flex items-center gap-3 text-[11.5px] text-ink-500 mt-0.5">
+            {% if task.due_date %}<span class="font-mono">{{ task.due_date }}</span>{% endif %}
+            {{ priority_badge(task.priority, cls='!text-[10px] !py-0') }}
+            {% if task.pname %}<a href="{{ url_for('prospects_detail', pid=task.prospect_id) }}" class="text-ink-600 hover:text-ink-900 inline-flex items-center gap-1.5">
+              <img class="av av-sm !w-4 !h-4" src="{{ avatar_url(task.pname, task.pphoto, task.ptype, domain_from(task.pweb)) }}">
+              {{ task.pname }}
+            </a>{% endif %}
+          </div>
+          {% if task.body %}<div class="text-[12px] text-ink-500 mt-1 whitespace-pre-line">{{ task.body }}</div>{% endif %}
+        </div>
+        <form method="post" action="{{ url_for('tasks_delete', tid=task.id) }}" class="opacity-0 group-hover:opacity-100">
+          <button class="text-ink-400 hover:text-rose-600" title="{{ tr('tasks.delete') }}"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% if overdue %}{{ tasklist(overdue, tr('tasks.overdue'), 'overdue') }}{% endif %}
+{% if today_t %}{{ tasklist(today_t, tr('tasks.today'), 'today') }}{% endif %}
+{% if upcoming %}{{ tasklist(upcoming, tr('tasks.upcoming'), 'upcoming') }}{% endif %}
+{% if no_date %}{{ tasklist(no_date, tr('tasks.no_date'), 'no_date') }}{% endif %}
+
+{% if not (overdue or today_t or upcoming or no_date) %}
+<div class="bg-white border border-line rounded-xl p-12 text-center">
+  <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-ink-50 grid place-items-center text-ink-400 border border-line">
+    <i data-lucide="check-square" class="w-6 h-6"></i>
+  </div>
+  <div class="font-semibold text-ink-900">{{ tr('tasks.all_done') }}</div>
+  <p class="text-[13px] text-ink-500 mt-1">{{ tr('tasks.empty_hint') }}</p>
+</div>
+{% endif %}
+
+{% if done %}
+<details class="mt-6">
+  <summary class="cursor-pointer text-[12.5px] font-semibold text-ink-500 hover:text-ink-900 inline-flex items-center gap-2">
+    <i data-lucide="chevron-right" class="w-4 h-4 transition-transform group-open:rotate-90"></i>
+    {{ tr('tasks.recently_done') }} ({{ done|length }})
+  </summary>
+  <div class="mt-3">{{ tasklist(done, tr('tasks.done'), 'done') }}</div>
+</details>
+{% endif %}
+
+{% endblock %}

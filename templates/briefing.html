@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}{{ tr('brief.title') }} · {{ p.full_name }}{% endblock %}
+{% block content %}
+
+<div class="text-[12px] font-medium text-ink-400 mb-3">
+  <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="hover:text-ink-700">{{ p.full_name }}</a>
+  <span class="text-ink-300 mx-1">/</span>
+  <span class="text-ink-700">{{ tr('brief.breadcrumb') }}</span>
+</div>
+
+<div class="flex items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-[26px] font-bold tracking-tight">{{ tr('brief.heading') }}</h1>
+    <p class="text-[13px] text-ink-500 mt-1">{{ tr('brief.subtitle') }}</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <form method="post"><button class="btn-primary" {% if briefing %}onclick="return confirm('{{ tr('brief.confirm_regenerate') }}')"{% endif %}>
+      <i data-lucide="sparkles" class="w-4 h-4"></i> {% if briefing %}{{ tr('brief.regenerate') }}{% else %}{{ tr('brief.generate') }}{% endif %}
+    </button></form>
+    <div x-data="{open:false, d:'{{ now.strftime('%Y-%m-%d') }}', t:'10:00', m:'30'}" class="relative">
+      <button type="button" @click="open=!open" class="btn-ghost"><i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i> {{ tr('brief.schedule_call') }}</button>
+      <div x-show="open" x-cloak x-transition @click.outside="open=false"
+           class="absolute right-0 mt-2 z-40 bg-white border border-line rounded-xl shadow-xl p-4 w-64 space-y-3 text-left">
+        <div class="field"><label class="label">{{ tr('brief.date') }}</label><input type="date" x-model="d"></div>
+        <div class="field"><label class="label">{{ tr('brief.time') }}</label><input type="time" x-model="t"></div>
+        <div class="field"><label class="label">{{ tr('brief.duration_minutes') }}</label><input type="number" min="15" step="15" x-model="m"></div>
+        <a :href="`{{ url_for('prospects_calendar_ics', pid=p.id) }}?date=${d}&time=${t}&minutes=${m}`"
+           @click="open=false" class="btn-primary btn-sm w-full !justify-center">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i> {{ tr('brief.download_ics') }}
+        </a>
+        <p class="text-[11px] text-ink-400 leading-snug">{{ tr('brief.ics_hint') }}</p>
+      </div>
+    </div>
+    {% if briefing %}<button onclick="window.print()" class="btn-ghost"><i data-lucide="printer" class="w-3.5 h-3.5"></i> {{ tr('brief.print') }}</button>{% endif %}
+  </div>
+</div>
+
+{% if error %}<div class="bg-rose-50 border border-rose-200 text-rose-900 rounded-xl p-4 mb-4">{{ error }}</div>{% endif %}
+
+{% if briefing %}
+<div class="briefing-page bg-white border border-line rounded-2xl p-10 mx-auto" style="max-width:880px;box-shadow:0 30px 60px -30px rgba(0,0,0,.1)">
+  <div class="flex items-center gap-4 mb-6 pb-6 border-b border-line">
+    <img class="av av-lg" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}">
+    <div>
+      <h2 class="text-[26px] font-bold tracking-tight">{{ p.full_name }}</h2>
+      <div class="text-[14px] text-ink-600 mt-1">{{ p.role or '' }}{% if p.role and p.company %} · {% endif %}{{ p.company or '' }}{% if p.location %} · {{ p.location }}{% endif %}</div>
+    </div>
+  </div>
+
+  <div class="mb-6">
+    <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-2">{{ tr('brief.section_headline') }}</div>
+    <p class="text-[18px] font-semibold leading-snug">{{ briefing.headline }}</p>
+  </div>
+
+  <div class="mb-6 p-5 rounded-xl bg-ink-50 border border-line">
+    <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-2 flex items-center gap-2"><i data-lucide="play-circle" class="w-3.5 h-3.5"></i> {{ tr('brief.section_opening') }}</div>
+    <p class="text-[15px] leading-relaxed italic">"{{ briefing.opening }}"</p>
+  </div>
+
+  <div class="mb-6">
+    <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-3 flex items-center gap-2"><i data-lucide="message-square-quote" class="w-3.5 h-3.5"></i> {{ tr('brief.section_talking_points') }}</div>
+    <div class="space-y-3">
+      {% for tp in briefing.talking_points %}
+      <div class="border border-line rounded-xl p-4">
+        <div class="font-semibold text-[14.5px] mb-1">{{ loop.index }}. {{ tp.topic }}</div>
+        <div class="text-[13px] text-ink-600 mb-2"><strong>{{ tr('brief.why') }}</strong> {{ tp.why }}</div>
+        <div class="text-[13px] text-ink-700"><strong>{{ tr('brief.question') }}</strong> {{ tp.question }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 mb-2">{{ tr('brief.ask_suggested') }}</div>
+      <div class="text-[14px] text-emerald-900 leading-relaxed">{{ briefing.ask_suggestion }}</div>
+    </div>
+    <div class="p-4 rounded-xl bg-rose-50 border border-rose-200">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-rose-700 mb-2">{{ tr('brief.topics_to_avoid') }}</div>
+      <ul class="text-[13px] text-rose-900 list-disc list-inside space-y-1">
+        {% for t in briefing.topics_to_avoid %}<li>{{ t }}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="mb-6">
+    <div class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-2 flex items-center gap-2"><i data-lucide="link" class="w-3.5 h-3.5"></i> {{ tr('brief.match_with_org') }}</div>
+    <ul class="text-[14px] space-y-1 list-disc list-inside text-ink-700">
+      {% for m in briefing.match_with_org %}<li>{{ m }}</li>{% endfor %}
+    </ul>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t border-line">
+    <div>
+      <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 mb-2">{{ tr('brief.if_yes') }}</div>
+      <p class="text-[13px] text-ink-700">{{ briefing.next_steps_if_yes }}</p>
+    </div>
+    <div>
+      <div class="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-2">{{ tr('brief.if_no') }}</div>
+      <p class="text-[13px] text-ink-700">{{ briefing.next_steps_if_no }}</p>
+    </div>
+  </div>
+</div>
+<style>@media print { aside, header, .btn-primary, .btn-ghost, .btn-danger, nav, .nav { display: none !important; } body, main { background: white !important; } .briefing-page { box-shadow: none !important; border: none !important; } }</style>
+{% else %}
+<div class="bg-white border border-line rounded-2xl p-16 text-center">
+  <div class="w-16 h-16 mx-auto mb-5 rounded-2xl bg-ink-100 grid place-items-center text-ink-700 border border-line">
+    <i data-lucide="file-text" class="w-7 h-7"></i>
+  </div>
+  <h2 class="text-[20px] font-bold">{{ tr('brief.empty_title') }}</h2>
+  <p class="text-[13.5px] text-ink-500 mt-2 max-w-md mx-auto">{{ tr('brief.empty_body') }}</p>
+  <form method="post" class="mt-5"><button class="btn-primary"><i data-lucide="sparkles" class="w-4 h-4"></i> {{ tr('brief.generate') }}</button></form>
+</div>
+{% endif %}
+
+{% endblock %}

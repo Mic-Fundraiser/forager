@@ -1,0 +1,390 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import stage_badge, type_badge, priority_badge, score_ring, stars, page_header with context %}
+{% block title %}Dashboard · Forager{% endblock %}
+{% block content %}
+
+{% call page_header(tr('dash.title'), eyebrow=tr('dash.workspace'), subtitle=tr('dash.subtitle')) %}
+  <a href="{{ url_for('prospects_new') }}" class="btn-ghost btn-sm">
+    <i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('dash.new_prospect') }}
+  </a>
+  <a href="{{ url_for('research_index') }}" class="btn-primary btn-sm">
+    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> {{ tr('dash.start_research') }}
+  </a>
+{% endcall %}
+
+<!-- ORG STATUS BANNER -->
+{% if not org_ctx or not org_ctx.name %}
+<a href="{{ url_for('organization') }}" class="block bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 hover:bg-amber-100/60 transition">
+  <div class="flex items-start gap-3">
+    <div class="w-10 h-10 rounded-lg bg-white grid place-items-center text-amber-700 shrink-0 border border-amber-200"><i data-lucide="briefcase" class="w-4 h-4"></i></div>
+    <div class="flex-1">
+      <div class="font-semibold text-amber-900 text-[13.5px]">{{ tr('dash.org_setup_title') }}</div>
+      <p class="text-[12.5px] text-amber-800 mt-1">{{ tr('dash.org_setup_desc') }}</p>
+    </div>
+    <i data-lucide="arrow-right" class="w-4 h-4 text-amber-700 mt-3 shrink-0"></i>
+  </div>
+</a>
+{% else %}
+<a href="{{ url_for('organization') }}" class="block bg-white border border-line rounded-xl p-4 mb-6 hover:border-ink-300 transition">
+  <div class="flex items-start gap-3">
+    <div class="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 grid place-items-center text-emerald-700 shrink-0"><i data-lucide="briefcase" class="w-4 h-4"></i></div>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="font-semibold text-ink-900 text-[13.5px] truncate">{{ org_ctx.name }}</div>
+        {% if org_ctx.legal_form %}<span class="b b-slate">{{ org_ctx.legal_form }}</span>{% endif %}
+        <span class="b b-emerald"><span class="dot"></span>{{ tr('dash.briefing_active') }}</span>
+      </div>
+      {% if org_ctx.cause_areas %}<p class="text-[12.5px] text-ink-500 mt-1 truncate">{{ tr('dash.causes') }} {{ org_ctx.cause_areas }}</p>{% endif %}
+    </div>
+    <i data-lucide="settings-2" class="w-4 h-4 text-ink-400 mt-3 shrink-0"></i>
+  </div>
+</a>
+{% endif %}
+
+{% if total == 0 %}
+<!-- ONBOARDING: Inizia da qui (solo a database vuoto) -->
+{% set s1 = org_ctx and org_ctx.name %}
+<div class="bg-white border border-line rounded-xl p-5 md:p-6 mb-6">
+  <div class="flex items-center gap-3 mb-4">
+    <div class="w-9 h-9 rounded-lg bg-ink-900 grid place-items-center text-white shrink-0"><i data-lucide="rocket" class="w-4 h-4"></i></div>
+    <div>
+      <h3 class="t-h2">{{ tr('onb.title') }}</h3>
+      <p class="text-[12.5px] text-ink-500">{{ tr('onb.subtitle') }}</p>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <a href="{{ url_for('organization') }}" class="flex flex-col gap-1.5 p-4 rounded-xl border {% if s1 %}bg-emerald-50/40 border-emerald-200{% else %}border-line hover:border-ink-300{% endif %} transition">
+      <div class="flex items-center gap-2.5">
+        {% if s1 %}<span class="w-6 h-6 rounded-full bg-emerald-500 text-white grid place-items-center shrink-0"><i data-lucide="check" class="w-3.5 h-3.5" stroke-width="3"></i></span>
+        {% else %}<span class="w-6 h-6 rounded-full bg-ink-900 text-white text-[12px] font-bold grid place-items-center shrink-0">1</span>{% endif %}
+        <span class="font-semibold text-[13.5px] text-ink-900">{{ tr('onb.step1') }}</span>
+      </div>
+      <p class="text-[12px] text-ink-500 pl-[34px] leading-snug">{{ tr('onb.step1_desc') }}</p>
+      <span class="pl-[34px] text-[12px] font-semibold {% if s1 %}text-emerald-700{% else %}text-ink-900{% endif %} inline-flex items-center gap-1">{% if s1 %}{{ tr('onb.done') }}{% else %}{{ tr('onb.go') }} <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>{% endif %}</span>
+    </a>
+    <a href="{{ url_for('research_index') }}" class="flex flex-col gap-1.5 p-4 rounded-xl border border-line hover:border-ink-300 transition">
+      <div class="flex items-center gap-2.5">
+        <span class="w-6 h-6 rounded-full bg-ink-900 text-white text-[12px] font-bold grid place-items-center shrink-0">2</span>
+        <span class="font-semibold text-[13.5px] text-ink-900">{{ tr('onb.step2') }}</span>
+      </div>
+      <p class="text-[12px] text-ink-500 pl-[34px] leading-snug">{{ tr('onb.step2_desc') }}</p>
+      <span class="pl-[34px] text-[12px] font-semibold text-ink-900 inline-flex items-center gap-1">{{ tr('onb.go') }} <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+    </a>
+    <a href="{{ url_for('goals') }}" class="flex flex-col gap-1.5 p-4 rounded-xl border {% if active_goals %}bg-emerald-50/40 border-emerald-200{% else %}border-line hover:border-ink-300{% endif %} transition">
+      <div class="flex items-center gap-2.5">
+        {% if active_goals %}<span class="w-6 h-6 rounded-full bg-emerald-500 text-white grid place-items-center shrink-0"><i data-lucide="check" class="w-3.5 h-3.5" stroke-width="3"></i></span>
+        {% else %}<span class="w-6 h-6 rounded-full bg-ink-900 text-white text-[12px] font-bold grid place-items-center shrink-0">3</span>{% endif %}
+        <span class="font-semibold text-[13.5px] text-ink-900">{{ tr('onb.step3') }}</span>
+      </div>
+      <p class="text-[12px] text-ink-500 pl-[34px] leading-snug">{{ tr('onb.step3_desc') }}</p>
+      <span class="pl-[34px] text-[12px] font-semibold {% if active_goals %}text-emerald-700{% else %}text-ink-900{% endif %} inline-flex items-center gap-1">{% if active_goals %}{{ tr('onb.done') }}{% else %}{{ tr('onb.go') }} <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>{% endif %}</span>
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<!-- KPI -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
+  <div class="bg-white border border-line rounded-xl p-4 md:p-5 card-hover min-w-0" title="{{ tr('dash.kpi_raised_tip') }}">
+    <div class="flex items-center justify-between">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 truncate min-w-0">{{ tr('dash.kpi_raised') }} {{ today.year }}</div>
+      <div class="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 grid place-items-center text-emerald-700"><i data-lucide="banknote" class="w-4 h-4"></i></div>
+    </div>
+    <div class="mt-3 text-[26px] font-bold tracking-tight font-mono">{{ raised.received_year|money }}</div>
+    <div class="mt-1 text-[12px] text-ink-500">
+      {% if forecast_weighted %}+ {{ forecast_weighted|money }} {{ tr('dash.forecast_pipeline') }}{% if raised.promised %} · {{ raised.promised|money }} {{ tr('dash.promised') }}{% endif %}
+      {% elif raised.promised %}{{ raised.promised|money }} {{ tr('dash.promised') }}
+      {% else %}<a href="{{ url_for('prospects_list') }}" class="hover:text-ink-900">{{ tr('dash.kpi_no_forecast_hint') }}</a>{% endif %}
+    </div>
+  </div>
+
+  <a href="{{ url_for('prospects_list') }}" class="block bg-white border border-line rounded-xl p-4 md:p-5 card-hover min-w-0">
+    <div class="flex items-center justify-between">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-ink-500 truncate min-w-0">{{ tr('dash.kpi_total_prospects') }}</div>
+      <div class="w-8 h-8 rounded-lg bg-ink-100 grid place-items-center text-ink-700"><i data-lucide="users-round" class="w-4 h-4"></i></div>
+    </div>
+    <div class="mt-3 text-[26px] font-bold tracking-tight font-mono">{{ total }}</div>
+    <div class="mt-1 text-[12px] text-ink-500">{{ individuals }} {{ tr('dash.major_donor') }} · {{ corporates }} {{ tr('dash.corporate') }} · {{ foundations }} {{ tr('dash.foundations') }}</div>
+  </a>
+
+  <div class="bg-white border border-line rounded-xl p-4 md:p-5 card-hover min-w-0">
+    <div class="flex items-center justify-between">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-ink-500 truncate min-w-0">{{ tr('dash.kpi_running_jobs') }}</div>
+      <div class="w-8 h-8 rounded-lg bg-ink-100 grid place-items-center text-ink-700"><i data-lucide="loader-circle" class="w-4 h-4 {% if running_jobs %}animate-spin{% endif %}"></i></div>
+    </div>
+    <div class="mt-3 text-[26px] font-bold tracking-tight font-mono">{{ running_jobs }}</div>
+    <div class="mt-1 text-[12px] text-ink-500">{{ tr('dash.active_ai_research') }}</div>
+  </div>
+
+  <a href="{{ url_for('tasks') }}" class="bg-white border border-line rounded-xl p-4 md:p-5 card-hover block min-w-0 {% if overdue_count %}!border-rose-200{% endif %}">
+    <div class="flex items-center justify-between">
+      <div class="text-[11px] font-semibold uppercase tracking-wider truncate min-w-0 {% if overdue_count %}text-rose-600{% else %}text-ink-500{% endif %}">{{ tr('dash.kpi_overdue_tasks') }}</div>
+      <div class="w-8 h-8 rounded-lg grid place-items-center {% if overdue_count %}bg-rose-50 text-rose-600{% else %}bg-ink-100 text-ink-700{% endif %}"><i data-lucide="alarm-clock" class="w-4 h-4"></i></div>
+    </div>
+    <div class="mt-3 text-[26px] font-bold tracking-tight font-mono {% if overdue_count %}text-rose-600{% endif %}">{{ overdue_count }}</div>
+    <div class="mt-1 text-[12px] text-ink-500">{% if overdue_count %}{{ tr('dash.recover_now') }}{% else %}{{ tr('dash.all_caught_up') }}{% endif %}</div>
+  </a>
+</div>
+
+{% if news_signals %}
+<!-- SEGNALI RECENTI (opportunity dalle news) -->
+<div class="bg-white border border-line rounded-xl mb-8 overflow-hidden">
+  <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+    <div>
+      <h3 class="text-[14px] font-semibold text-ink-900 flex items-center gap-2"><i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i> {{ tr('dash.signals_title') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('dash.signals_desc') }}</p>
+    </div>
+  </div>
+  <div class="divide-y divide-ink-100">
+    {% for n in news_signals %}
+    <div class="px-6 py-3 flex items-start gap-3 hover:bg-ink-50">
+      <img class="!w-7 !h-7 av av-sm mt-0.5" src="{{ avatar_url(n.pname, n.pphoto, n.ptype, domain_from(n.pweb)) }}">
+      <div class="flex-1 min-w-0">
+        <a href="{{ url_for('prospects_detail', pid=n.prospect_id) }}#news" class="font-semibold text-ink-900 text-[13px] hover:text-ink-700">{{ n.pname }}</a>
+        <span class="b b-emerald !text-[10px] ml-1">{{ tr('dash.opportunity') }}</span>
+        <div class="text-[12.5px] text-ink-700 mt-0.5 leading-snug">{{ n.signal_note or n.title }}</div>
+        <div class="text-[11px] text-ink-400 mt-0.5">{% if n.publisher %}{{ n.publisher }}{% endif %}{% if n.published_at %} · {{ n.published_at }}{% endif %}</div>
+      </div>
+      <a href="{{ n.url }}" target="_blank" rel="noopener" class="text-ink-300 hover:text-ink-700 mt-0.5" title="{{ tr('dash.open_article') }}"><i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if thank_queue %}
+<!-- DA RINGRAZIARE (donazioni incassate, non ancora ringraziate) -->
+<div class="bg-white border border-rose-200 rounded-xl mb-8 overflow-hidden">
+  <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+    <div>
+      <h3 class="text-[14px] font-semibold text-ink-900 flex items-center gap-2"><i data-lucide="heart-handshake" class="w-4 h-4 text-rose-600"></i> {{ tr('dash.thank_title') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('dash.thank_desc') }}</p>
+    </div>
+  </div>
+  <div class="divide-y divide-ink-100">
+    {% for g in thank_queue %}
+    <div class="px-6 py-3 flex items-center gap-3 hover:bg-ink-50">
+      <img class="!w-7 !h-7 av av-sm" src="{{ avatar_url(g.pname, g.pphoto, g.ptype, domain_from(g.pweb)) }}">
+      <div class="flex-1 min-w-0">
+        <a href="{{ url_for('prospects_detail', pid=g.prospect_id) }}#gifts" class="font-semibold text-ink-900 text-[13px] hover:text-ink-700">{{ g.pname }}</a>
+        <div class="text-[11.5px] text-ink-500">{{ g.amount_eur|money }}{% if g.gift_date %} · {{ g.gift_date }}{% endif %}</div>
+      </div>
+      <form method="post" action="{{ url_for('gifts_thank', gid=g.id) }}">
+        <button class="btn-ghost btn-sm"><i data-lucide="check" class="w-3.5 h-3.5"></i> {{ tr('dash.mark_thanked') }}</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if recontact_queue %}
+<!-- DA RICONTATTARE (next_contact_date scaduto o di oggi) -->
+<div class="bg-white border border-amber-200 rounded-xl mb-8 overflow-hidden">
+  <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+    <div>
+      <h3 class="text-[14px] font-semibold text-ink-900 flex items-center gap-2"><i data-lucide="phone-call" class="w-4 h-4 text-amber-600"></i> {{ tr('cadence.queue_title') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('cadence.queue_empty') if not recontact_queue else '' }}</p>
+    </div>
+  </div>
+  <div class="divide-y divide-ink-100">
+    {% for r in recontact_queue %}
+    <div class="px-6 py-3 flex items-center gap-3 hover:bg-ink-50">
+      <img class="!w-7 !h-7 av av-sm" src="{{ avatar_url(r.full_name, r.photo_url, r.type, domain_from(r.website)) }}">
+      <div class="flex-1 min-w-0">
+        <a href="{{ url_for('prospects_detail', pid=r.id) }}" class="font-semibold text-ink-900 text-[13px] hover:text-ink-700">{{ r.full_name }}</a>
+        <div class="text-[11.5px] text-ink-500">
+          {{ tr('cadence.next_contact') }}: <span class="{% if r.next_contact_date < today.isoformat() %}text-rose-700 font-semibold{% endif %}">{{ r.next_contact_date }}</span>
+          · {{ tr('cadence.last_contact')|lower }}: {{ r.last_contact_date or tr('cadence.never') }}
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('prospects_contacted', pid=r.id) }}">
+        <input type="hidden" name="next" value="{{ url_for('dashboard') }}">
+        <button class="btn-ghost btn-sm"><i data-lucide="check" class="w-3.5 h-3.5"></i> {{ tr('cadence.contacted_today') }}</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- PIPELINE -->
+<div class="bg-white border border-line rounded-xl mb-8">
+  <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+    <div>
+      <h3 class="text-[14px] font-semibold text-ink-900">{{ tr('dash.pipeline_title') }}</h3>
+      <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('dash.pipeline_desc') }}</p>
+    </div>
+    <a href="{{ url_for('prospects_list') }}" class="text-[13px] font-medium text-ink-500 hover:text-ink-900">{{ tr('dash.see_all') }}</a>
+  </div>
+  <div class="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    {% set stage_colors = {'identified':'bg-stone-400','qualified':'bg-blue-500','cultivated':'bg-teal-500','solicited':'bg-amber-500','stewarded':'bg-emerald-500','declined':'bg-rose-500'} %}
+    {% for col in pipeline_breakdown %}
+    <a href="{{ url_for('prospects_list', stage=col.stage) }}" class="kanban-col">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] uppercase tracking-wider font-bold text-ink-500">{{ col.label }}</span>
+        <span class="w-2 h-2 rounded-full {{ stage_colors[col.stage] }}"></span>
+      </div>
+      <div class="mt-3 text-[24px] font-bold tracking-tight font-mono text-ink-900">{{ col.count }}</div>
+      <div class="text-[11px] text-ink-500 font-mono mt-1">{{ col.amount|money if col.amount else '—' }}</div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- TASKS + GOALS -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+  <div class="xl:col-span-2 bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <div>
+        <h3 class="text-[14px] font-semibold text-ink-900 flex items-center gap-2"><i data-lucide="check-square" class="w-4 h-4 text-ink-700"></i> {{ tr('dash.tasks_today_title') }}</h3>
+        <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('dash.tasks_today_desc') }}</p>
+      </div>
+      <a href="{{ url_for('tasks') }}" class="text-[13px] font-medium text-ink-500 hover:text-ink-900">{{ tr('dash.all_tasks') }}</a>
+    </div>
+    {% if tasks_today %}
+    <div class="divide-y divide-ink-100">
+      {% for t in tasks_today %}
+      <div class="px-6 py-3 flex items-center gap-3 hover:bg-ink-50">
+        <form method="post" action="{{ url_for('tasks_toggle', tid=t.id) }}">
+          <button class="w-5 h-5 rounded-md border-2 border-ink-300 hover:border-ink-900 grid place-items-center"></button>
+        </form>
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-ink-900 text-[13.5px] truncate">{{ t.title }}</div>
+          <div class="flex items-center gap-3 text-[11.5px] text-ink-500 mt-0.5">
+            {% if t.due_date %}<span class="font-mono {% if t.due_date < today.isoformat() %}text-rose-600 font-semibold{% endif %}">{{ t.due_date }}</span>{% else %}<span class="text-ink-400">{{ tr('dash.no_date') }}</span>{% endif %}
+            {% if t.pname %}<a href="{{ url_for('prospects_detail', pid=t.prospect_id) }}" class="text-ink-600 hover:text-ink-900 inline-flex items-center gap-1.5">
+              <img class="!w-4 !h-4 av av-sm" src="{{ avatar_url(t.pname, t.pphoto, t.ptype, domain_from(t.pweb)) }}">
+              {{ t.pname }}
+            </a>{% endif %}
+          </div>
+        </div>
+        {{ priority_badge(t.priority, cls='!text-[10px]') }}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="px-6 py-10 text-center">
+      <div class="text-[13px] text-ink-500">{{ tr('dash.no_tasks_today') }}</div>
+      <a href="{{ url_for('tasks') }}" class="btn-ghost btn-sm mt-3 inline-flex"><i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('dash.create_task') }}</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold text-ink-900 flex items-center gap-2"><i data-lucide="target" class="w-4 h-4 text-ink-700"></i> {{ tr('dash.goals') }}</h3>
+      <a href="{{ url_for('goals') }}" class="text-[13px] font-medium text-ink-500 hover:text-ink-900">{{ tr('dash.manage') }}</a>
+    </div>
+    <div class="p-6">
+      {% if active_goals %}
+        {% set total_forecast = raised.received + forecast_weighted %}
+        <p class="text-[11px] text-ink-500 mb-3 leading-snug">{{ tr('dash.outlook_note') }}</p>
+        {% for g in active_goals %}
+        {% set pct = (total_forecast * 100 / g.target_eur)|round if g.target_eur else 0 %}
+        <div class="mb-4 last:mb-0">
+          <div class="flex items-start justify-between gap-2 mb-1.5">
+            <div class="font-semibold text-[13px] truncate">{{ g.label }}</div>
+            <div class="text-[11px] text-ink-500 font-mono shrink-0">{{ pct|int }}%</div>
+          </div>
+          <div class="w-full h-1.5 rounded-full bg-ink-100 overflow-hidden">
+            <div class="h-full {% if pct >= 100 %}bg-emerald-500{% elif pct >= 50 %}bg-blue-500{% else %}bg-amber-500{% endif %}" style="width: {{ [pct,100]|min }}%"></div>
+          </div>
+          <div class="text-[11px] text-ink-500 mt-1 font-mono">{{ total_forecast|money }} / {{ g.target_eur|money }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="text-center py-4">
+        <div class="text-[13px] text-ink-500 mb-3">{{ tr('dash.no_goals') }}</div>
+        <a href="{{ url_for('goals') }}" class="btn-ghost btn-sm inline-flex"><i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('dash.create_goal') }}</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- 2-COL -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+  <div class="xl:col-span-2 bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <div>
+        <h3 class="text-[14px] font-semibold text-ink-900">{{ tr('dash.top_prospects_title') }}</h3>
+        <p class="text-[12px] text-ink-500 mt-0.5">{{ tr('dash.top_prospects_desc') }}</p>
+      </div>
+      <a href="{{ url_for('prospects_list', sort='score') }}" class="text-[13px] font-medium text-ink-500 hover:text-ink-900">{{ tr('dash.all') }}</a>
+    </div>
+    {% if top_prospects %}
+    <div class="table-wrap"><table class="tbl">
+      <thead>
+        <tr>
+          <th>{{ tr('dash.col_prospect') }}</th>
+          <th>{{ tr('dash.col_stage') }}</th>
+          <th title="{{ tr('pdetail.score_capacity_help') }}"><span class="inline-flex items-center gap-1">{{ tr('dash.col_capacity') }} <i data-lucide="help-circle" class="w-3 h-3 text-ink-400"></i></span></th>
+          <th class="text-right" title="{{ tr('pdetail.score_propensity_help') }}"><span class="inline-flex items-center gap-1">{{ tr('dash.col_propensity') }} <i data-lucide="help-circle" class="w-3 h-3 text-ink-400"></i></span></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in top_prospects %}
+        <tr class="clickable" onclick="location='{{ url_for('prospects_detail', pid=p.id) }}'">
+          <td>
+            <div class="flex items-center gap-3">
+              <img class="av" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}" alt="">
+              <div class="min-w-0">
+                <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="font-semibold text-ink-900 truncate text-[13.5px] block hover:text-ink-700" onclick="event.stopPropagation()">{{ p.full_name }}</a>
+                <div class="text-ink-500 text-[12px] truncate max-w-[28ch]">{{ p.role or '' }}{% if p.role and p.company %} · {% endif %}{{ p.company or '' }}</div>
+              </div>
+            </div>
+          </td>
+          <td>{{ stage_badge(p.stage) }}</td>
+          <td>{{ stars(p.capacity_rating) }}</td>
+          <td class="text-right">{{ score_ring(p.propensity_score, 'sm', 'ml-auto') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}
+    <div class="px-6 py-16 text-center">
+      <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-ink-50 grid place-items-center text-ink-400 border border-line">
+        <i data-lucide="search-x" class="w-6 h-6"></i>
+      </div>
+      <div class="font-semibold text-ink-900">{{ tr('dash.no_prospects') }}</div>
+      <p class="text-[13px] text-ink-500 mt-1 mb-4">{{ tr('dash.no_prospects_desc') }}</p>
+      <a href="{{ url_for('research_index') }}" class="btn-primary btn-sm">{{ tr('dash.start_research') }}</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="bg-white border border-line rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+      <h3 class="text-[14px] font-semibold text-ink-900">{{ tr('dash.recent_activity') }}</h3>
+    </div>
+    <div class="px-6 py-4 max-h-[480px] overflow-auto">
+      {% if recent %}
+        {% for a in recent %}
+        <div class="tl-row">
+          <div class="d" style="background: {% if a.type=='ai_research' %}#0d9488{% elif a.type=='stage_change' %}#10b981{% elif a.type=='email' %}#0891b2{% else %}#18181b{% endif %}"></div>
+          <div class="min-w-0">
+            <div class="font-semibold text-ink-900 text-[13px] truncate">{{ a.title or a.type }}</div>
+            <div class="text-[11px] text-ink-400 mt-0.5">
+              <span class="font-mono">{{ a.happened_at[:16] }}</span> ·
+              <a href="{{ url_for('prospects_detail', pid=a.prospect_id) }}" class="text-ink-700 hover:text-ink-900 font-medium">{{ a.full_name }}</a>
+            </div>
+            {% if a.body %}<div class="text-[12px] text-ink-500 mt-1.5 leading-relaxed">{{ a.body[:140] }}{% if a.body|length>140 %}…{% endif %}</div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="py-12 text-center">
+        <div class="w-12 h-12 mx-auto mb-3 rounded-xl bg-ink-50 grid place-items-center text-ink-400 border border-line">
+          <i data-lucide="activity" class="w-5 h-5"></i>
+        </div>
+        <div class="text-[13px] text-ink-500">{{ tr('dash.no_activity') }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

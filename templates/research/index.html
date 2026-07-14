@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block title %}Prospect Research · Forager{% endblock %}
+{% block content %}
+
+<div class="flex items-end justify-between gap-4 mb-8">
+  <div>
+    <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('research.workspace') }}</div>
+    <h1 class="text-[28px] font-bold tracking-tight">{{ tr('research.title') }}</h1>
+    <p class="text-[13px] text-ink-500 mt-1">{{ tr('research.subtitle') }}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+  <div class="xl:col-span-2 space-y-6">
+    {% if org_ctx and org_ctx.name %}
+    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-white border border-emerald-200 grid place-items-center text-emerald-700 shrink-0"><i data-lucide="check-circle-2" class="w-4 h-4"></i></div>
+      <div class="flex-1 text-[13px] text-emerald-900">
+        <strong>{{ tr('research.briefing_active') }}</strong> {{ org_ctx.name }}{% if org_ctx.cause_areas %} — {{ org_ctx.cause_areas[:80] }}{% if org_ctx.cause_areas|length > 80 %}…{% endif %}{% endif %}
+      </div>
+      <a href="{{ url_for('organization') }}" class="text-[12px] text-emerald-800 font-semibold hover:text-emerald-900">{{ tr('research.edit') }} →</a>
+    </div>
+    {% else %}
+    <a href="{{ url_for('organization') }}" class="block bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100/60 transition">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-white border border-amber-200 grid place-items-center text-amber-700 shrink-0"><i data-lucide="alert-circle" class="w-4 h-4"></i></div>
+        <div class="flex-1 text-[13px] text-amber-900">
+          <strong>{{ tr('research.no_briefing_title') }}</strong> {{ tr('research.no_briefing_body') }}
+        </div>
+        <i data-lucide="arrow-right" class="w-4 h-4 text-amber-700 shrink-0"></i>
+      </div>
+    </a>
+    {% endif %}
+
+    <!-- FORM -->
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="px-7 py-5 border-b border-line">
+        <h3 class="text-[15px] font-semibold flex items-center gap-2"><i data-lucide="sparkles" class="w-4 h-4 text-ink-700"></i> {{ tr('research.new_search') }}</h3>
+        <p class="text-[12.5px] text-ink-500 mt-0.5">{{ tr('research.new_search_hint') }}</p>
+      </div>
+      {% set f = form or {} %}
+      {% if dup %}
+      <div class="mx-7 mt-5 bg-amber-50 border border-amber-300 rounded-xl p-4">
+        <div class="flex items-start gap-3">
+          <i data-lucide="copy-check" class="w-5 h-5 text-amber-700 mt-0.5 shrink-0"></i>
+          <div class="flex-1 text-[12.5px] text-amber-900">
+            <strong><a href="{{ url_for('prospects_detail', pid=dup.id) }}" class="underline">{{ dup.full_name }}</a></strong> {{ tr('research.dup_warning') }}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      <form method="post" class="p-7 space-y-5">
+        {% if dup %}<input type="hidden" name="confirm_duplicate" value="1">{% endif %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="field">
+            <label class="label">{{ tr('research.field_name') }} <span class="req">*</span></label>
+            <input name="full_name" required autofocus placeholder="{{ tr('research.field_name_ph') }}" value="{{ f.get('full_name','') }}">
+          </div>
+          <div class="field">
+            <label class="label">{{ tr('research.field_type') }}</label>
+            <select name="type">
+              {% for tk in PROSPECT_TYPES %}<option value="{{ tk }}" {% if f.get('type')==tk %}selected{% endif %}>{{ TYPE_LABELS[tk] }}{% if tk=='individual' %} {{ tr('research.type_hint_individual') }}{% elif tk=='corporate' %} {{ tr('research.type_hint_corporate') }}{% else %} {{ tr('research.type_hint_foundation') }}{% endif %}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="field">
+            <label class="label">{{ tr('research.field_context') }}</label>
+            <input name="context" placeholder="{{ tr('research.field_context_ph') }}" value="{{ f.get('context','') }}">
+          </div>
+          <div class="field">
+            <label class="label">{{ tr('research.field_country') }}</label>
+            <input name="country" placeholder="{{ tr('research.field_country_ph') }}" value="{{ f.get('country','') }}">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">{{ tr('research.field_focus') }}</label>
+          <textarea name="notes" placeholder="{{ tr('research.field_focus_ph') }}" rows="4">{{ f.get('notes','') }}</textarea>
+        </div>
+        <div class="flex justify-end pt-2 border-t border-line">
+          <button class="btn-primary btn-lg">
+            <i data-lucide="zap" class="w-4 h-4"></i>
+            {% if dup %}{{ tr('research.btn_run_anyway') }}{% else %}{{ tr('research.btn_run') }}{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- JOBS HISTORY -->
+    <div class="bg-white border border-line rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-line">
+        <h3 class="text-[14px] font-semibold">{{ tr('research.recent_jobs') }}</h3>
+        <span class="text-[11px] text-ink-400 font-mono">{{ jobs|length }}</span>
+      </div>
+      {% if jobs %}
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>{{ tr('research.th_target') }}</th><th>{{ tr('research.th_status') }}</th><th>{{ tr('research.th_started') }}</th><th>{{ tr('research.th_finished') }}</th><th></th></tr></thead>
+        <tbody>
+          {% for j in jobs %}
+          <tr>
+            <td class="font-semibold text-ink-900 text-[13px]">{{ j.full_name or '—' }}</td>
+            <td>
+              {% if j.status == 'done' %}<span class="b b-emerald"><span class="dot"></span> done</span>
+              {% elif j.status == 'error' %}<span class="b b-rose"><span class="dot"></span> error</span>
+              {% elif j.status == 'running' %}<span class="b b-live"><span class="dot"></span> running</span>
+              {% else %}<span class="b b-slate"><span class="dot"></span> pending</span>{% endif %}
+            </td>
+            <td class="font-mono text-[11px] text-ink-500">{{ j.started_at }}</td>
+            <td class="font-mono text-[11px] text-ink-500">{{ j.finished_at or '—' }}</td>
+            <td>{% if j.prospect_id %}<a class="btn-ghost btn-sm" href="{{ url_for('prospects_detail', pid=j.prospect_id) }}">{{ tr('research.open') }} <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></a>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}<div class="px-6 py-12 text-center text-[13px] text-ink-500">{{ tr('research.no_jobs') }}</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="space-y-6">
+    <div class="bg-white border border-line rounded-xl p-6">
+      <h3 class="text-[14px] font-semibold mb-4 flex items-center gap-2"><i data-lucide="info" class="w-4 h-4 text-ink-700"></i> {{ tr('research.how_it_works') }}</h3>
+      <ol class="space-y-3 text-[13px] text-ink-700">
+        <li class="flex gap-3"><span class="w-5 h-5 rounded-full bg-ink-900 text-white text-[10px] font-bold grid place-items-center shrink-0 mt-0.5">1</span><span>{{ tr('research.step_1') }}</span></li>
+        <li class="flex gap-3"><span class="w-5 h-5 rounded-full bg-ink-900 text-white text-[10px] font-bold grid place-items-center shrink-0 mt-0.5">2</span><span>{{ tr('research.step_2') }}</span></li>
+        <li class="flex gap-3"><span class="w-5 h-5 rounded-full bg-ink-900 text-white text-[10px] font-bold grid place-items-center shrink-0 mt-0.5">3</span><span>{{ tr('research.step_3') }}</span></li>
+        <li class="flex gap-3"><span class="w-5 h-5 rounded-full bg-ink-900 text-white text-[10px] font-bold grid place-items-center shrink-0 mt-0.5">4</span><span>{{ tr('research.step_4') }}</span></li>
+        <li class="flex gap-3"><span class="w-5 h-5 rounded-full bg-ink-900 text-white text-[10px] font-bold grid place-items-center shrink-0 mt-0.5">5</span><span>{{ tr('research.step_5') }}</span></li>
+      </ol>
+    </div>
+
+    <div class="bg-white border border-line rounded-xl p-6">
+      <h3 class="text-[14px] font-semibold mb-4 flex items-center gap-2"><i data-lucide="target" class="w-4 h-4 text-ink-700"></i> {{ tr('research.target_examples') }}</h3>
+      <div class="space-y-3 text-[13px]">
+        <div><div class="font-semibold text-ink-900">{{ tr('research.target_major_donor') }}</div><div class="text-ink-500 mt-0.5">{{ tr('research.target_major_donor_desc') }}</div></div>
+        <div><div class="font-semibold text-ink-900">{{ tr('research.target_corporate') }}</div><div class="text-ink-500 mt-0.5">{{ tr('research.target_corporate_desc') }}</div></div>
+        <div><div class="font-semibold text-ink-900">{{ tr('research.target_foundation') }}</div><div class="text-ink-500 mt-0.5">{{ tr('research.target_foundation_desc') }}</div></div>
+      </div>
+    </div>
+
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-5">
+      <div class="flex items-start gap-3">
+        <div class="w-9 h-9 rounded-lg bg-white border border-amber-200 text-amber-700 grid place-items-center shrink-0"><i data-lucide="shield-check" class="w-4 h-4"></i></div>
+        <div>
+          <div class="text-[11px] font-bold uppercase tracking-wider text-amber-800">{{ tr('research.ethics') }}</div>
+          <p class="text-[12.5px] text-amber-900 mt-1 leading-relaxed">{{ tr('research.ethics_body') }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

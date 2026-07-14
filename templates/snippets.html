@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Snippets · Forager{% endblock %}
+{% block content %}
+
+<div class="flex items-end justify-between gap-4 mb-8">
+  <div>
+    <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('snip.eyebrow') }}</div>
+    <h1 class="text-[28px] font-bold tracking-tight">{{ tr('snip.title') }}</h1>
+    <p class="text-[13.5px] text-ink-500 mt-1">{{ tr('snip.subtitle') }}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <form method="post" class="bg-white border border-line rounded-2xl p-5 space-y-3">
+    <h3 class="text-[14px] font-semibold">{{ tr('snip.new') }}</h3>
+    <div class="field"><label class="label">{{ tr('snip.name') }} <span class="req">*</span></label><input name="name" required placeholder="{{ tr('snip.name_ph') }}"></div>
+    <div class="field"><label class="label">{{ tr('snip.category') }}</label>
+      <select name="category">
+        <option value="intro">{{ tr('snip.cat_intro') }}</option>
+        <option value="closing">{{ tr('snip.cat_closing') }}</option>
+        <option value="ask">{{ tr('snip.cat_ask') }}</option>
+        <option value="followup">{{ tr('snip.cat_followup') }}</option>
+        <option value="custom">{{ tr('snip.cat_custom') }}</option>
+      </select>
+    </div>
+    <div class="field"><label class="label">{{ tr('snip.body') }} <span class="req">*</span></label><textarea name="body" required rows="6" placeholder="{{ tr('snip.body_ph') }}"></textarea></div>
+    <button class="btn-primary btn-sm w-full justify-center"><i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('snip.create') }}</button>
+  </form>
+
+  <div class="lg:col-span-2 bg-white border border-line rounded-2xl overflow-hidden">
+    <div class="px-5 py-3 border-b border-line"><h3 class="text-[14px] font-semibold">{{ tr('snip.library') }}</h3></div>
+    {% if snippets %}
+    <div class="divide-y divide-ink-100">
+      {% for s in snippets %}
+      <div class="px-5 py-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2"><span class="font-semibold text-[14px]">{{ s.name }}</span><span class="b b-slate">{{ s.category }}</span></div>
+          <form method="post" action="{{ url_for('snippets_delete', sid=s.id) }}" onsubmit="return confirm('{{ tr('snip.confirm_delete') }}')">
+            <button class="text-ink-400 hover:text-rose-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+          </form>
+        </div>
+        <pre class="font-mono text-[12px] text-ink-600 whitespace-pre-wrap bg-ink-50 border border-line rounded-lg p-3">{{ s.body }}</pre>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="px-5 py-12 text-center text-[13px] text-ink-500">{{ tr('snip.empty') }}</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

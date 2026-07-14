@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Tag · Forager{% endblock %}
+{% block content %}
+
+<div class="flex items-end justify-between gap-4 mb-8">
+  <div>
+    <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('tags.eyebrow') }}</div>
+    <h1 class="text-[28px] font-bold tracking-tight">{{ tr('tags.title') }}</h1>
+    <p class="text-[13.5px] text-ink-500 mt-1">{{ tr('tags.subtitle') }}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <form method="post" class="bg-white border border-line rounded-xl p-5 space-y-3 lg:col-span-1">
+    <h3 class="text-[14px] font-semibold">{{ tr('tags.new') }}</h3>
+    <div class="field"><label class="label">{{ tr('tags.name') }} <span class="req">*</span></label><input name="name" required placeholder="{{ tr('tags.name_ph') }}"></div>
+    <div class="field"><label class="label">{{ tr('tags.color') }}</label>
+      <select name="color">
+        <option value="slate">slate</option><option value="blue">blue</option>
+        <option value="teal">teal</option><option value="amber">amber</option>
+        <option value="emerald">emerald</option><option value="rose">rose</option>
+        <option value="indigo">indigo</option><option value="cyan">cyan</option>
+      </select>
+    </div>
+    <div class="field"><label class="label">{{ tr('tags.description') }}</label><textarea name="description" rows="2"></textarea></div>
+    <button class="btn-primary btn-sm w-full justify-center"><i data-lucide="plus" class="w-3.5 h-3.5"></i> {{ tr('tags.create') }}</button>
+  </form>
+
+  <div class="lg:col-span-2 bg-white border border-line rounded-xl overflow-hidden">
+    <div class="px-5 py-3 border-b border-line"><h3 class="text-[14px] font-semibold">{{ tr('tags.existing') }}</h3></div>
+    {% if tags %}
+    <div class="divide-y divide-ink-100">
+      {% for tag in tags %}
+      <div class="px-5 py-3 flex items-center gap-3">
+        <span class="b b-{{ tag.color or 'slate' }}"><span class="dot"></span>{{ tag.name }}</span>
+        <div class="flex-1 text-[12.5px] text-ink-500 truncate">{{ tag.description or '' }}</div>
+        <span class="text-[11px] text-ink-400 font-mono">{{ tag.n }} {{ tr('tags.prospect') }}</span>
+        <form method="post" action="{{ url_for('tags_delete', tid=tag.id) }}" onsubmit="return confirm('{{ tr('tags.confirm_delete') }}')">
+          <button class="text-ink-400 hover:text-rose-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="px-5 py-10 text-center text-[13px] text-ink-500">{{ tr('tags.empty') }}</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

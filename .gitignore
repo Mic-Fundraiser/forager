@@ -1,0 +1,44 @@
+# Forager — local files
+.env
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.python-version
+*.egg-info/
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+
+# Backups
+backups/
+*.bak
+
+# Packaging artifacts
+packaging/.cache/
+packaging/build/
+packaging/dist/
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/

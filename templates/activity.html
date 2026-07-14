@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}{{ tr('activity.title') }} · Forager{% endblock %}
+{% block content %}
+
+<div class="flex items-end justify-between gap-4 mb-8">
+  <div>
+    <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('activity.workspace') }}</div>
+    <h1 class="text-[28px] font-bold tracking-tight">{{ tr('activity.heading') }}</h1>
+    <p class="text-[13.5px] text-ink-500 mt-1">{{ tr('activity.subtitle') }}</p>
+  </div>
+</div>
+
+<div class="bg-white border border-line rounded-xl">
+  {% if items %}
+  <div class="divide-y divide-ink-100">
+    {% for a in items %}
+    <div class="px-6 py-4 flex items-start gap-4 hover:bg-ink-50">
+      <div class="w-9 h-9 rounded-lg shrink-0 grid place-items-center
+        {% if a.type=='ai_research' %}bg-teal-50 text-teal-700
+        {% elif a.type=='stage_change' %}bg-emerald-50 text-emerald-700
+        {% elif a.type=='email' %}bg-cyan-50 text-cyan-700
+        {% elif a.type=='task' %}bg-amber-50 text-amber-700
+        {% else %}bg-ink-100 text-ink-700{% endif %}">
+        <i data-lucide="{% if a.type=='ai_research' %}sparkles{% elif a.type=='stage_change' %}arrow-right-circle{% elif a.type=='email' %}mail{% elif a.type=='task' %}check-square{% elif a.type=='call' %}phone{% elif a.type=='meeting' %}calendar{% else %}message-square{% endif %}" class="w-4 h-4"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-[13.5px] text-ink-900">{{ a.title or a.type }}</div>
+        <div class="text-[12px] text-ink-500 mt-0.5 flex items-center gap-3">
+          <span class="font-mono">{{ a.happened_at[:16] }}</span>
+          {% if a.pname %}
+          <a href="{{ url_for('prospects_detail', pid=a.prospect_id) }}" class="inline-flex items-center gap-1.5 text-ink-700 hover:text-ink-900">
+            <img class="!w-4 !h-4 av av-sm" src="{{ avatar_url(a.pname, a.pphoto, a.ptype, domain_from(a.pweb)) }}">
+            {{ a.pname }}
+          </a>
+          {% endif %}
+        </div>
+        {% if a.body %}<div class="text-[12.5px] text-ink-600 mt-2 leading-relaxed whitespace-pre-line">{{ a.body[:300] }}{% if a.body|length > 300 %}…{% endif %}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="px-6 py-16 text-center">
+    <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-ink-50 grid place-items-center text-ink-400 border border-line">
+      <i data-lucide="activity" class="w-6 h-6"></i>
+    </div>
+    <div class="font-semibold text-ink-900">{{ tr('activity.empty_title') }}</div>
+    <p class="text-[13px] text-ink-500 mt-1">{{ tr('activity.empty_hint') }}</p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

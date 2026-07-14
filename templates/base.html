@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="{{ lang }}" class="h-full">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>{% block title %}Forager — CRM{% endblock %}</title>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<script src="{{ url_for('static', filename='vendor/tailwind.js') }}"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          ink: {
+            50:'#fafafa', 100:'#f4f4f5', 200:'#e4e4e7', 300:'#d4d4d8',
+            400:'#a1a1aa', 500:'#71717a', 600:'#52525b', 700:'#3f3f46',
+            800:'#27272a', 900:'#18181b', 950:'#09090b'
+          },
+          line: '#e7e5e4',
+        }
+      }
+    }
+  }
+</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<script src="{{ url_for('static', filename='vendor/lucide.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/htmx.js') }}"></script>
+<script defer src="{{ url_for('static', filename='vendor/alpine.js') }}"></script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2318181b'/><circle cx='13' cy='13' r='5' fill='none' stroke='white' stroke-width='2.4'/><line x1='17' y1='17' x2='23' y2='23' stroke='white' stroke-width='2.4' stroke-linecap='round'/></svg>">
+</head>
+<body class="h-full antialiased text-ink-900" hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}'>
+
+<a href="#main" class="sr-only focus:not-sr-only z-[100] top-3 left-3 bg-ink-900 text-white text-[13px] font-semibold px-4 py-2 rounded-lg shadow-lg">{{ tr('a11y.skip_to_content') }}</a>
+
+<div x-data="{ nav: false }" class="min-h-screen block lg:grid lg:grid-cols-[244px_1fr]">
+
+  <!-- backdrop mobile -->
+  <div x-show="nav" x-cloak @click="nav=false" class="fixed inset-0 bg-black/30 z-40 lg:hidden"></div>
+
+  <!-- SIDEBAR (light) — drawer su mobile, fissa da lg -->
+  <aside @keydown.escape.window="nav=false" role="navigation" aria-label="{{ tr('a11y.main_nav') }}"
+         class="fixed lg:sticky top-0 inset-y-0 left-0 z-50 w-[244px] h-screen bg-ink-50 border-r border-line px-3 py-4 overflow-y-auto flex flex-col -translate-x-full lg:translate-x-0 transition-transform duration-200"
+         :class="nav && '!translate-x-0'">
+    <a href="{{ url_for('dashboard') }}" class="flex items-center gap-2.5 px-2 py-1.5 mb-4">
+      <div class="w-8 h-8 rounded-lg bg-ink-900 grid place-items-center shadow-sm">
+        <i data-lucide="search" class="w-4 h-4 text-white" stroke-width="2.4"></i>
+      </div>
+      <div>
+        <div class="text-ink-900 text-[14px] font-semibold tracking-tight leading-tight">Forager</div>
+        <div class="text-[10.5px] uppercase tracking-[.14em] text-ink-500 font-semibold">Fundraising · CRM</div>
+      </div>
+    </a>
+
+    <div class="nav-section !pt-1">{{ tr('nav.section_main') }}</div>
+    <div class="space-y-1">
+      <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint=='dashboard' %}active{% endif %}"{% if request.endpoint=='dashboard' %} aria-current="page"{% endif %}>
+        <i data-lucide="layout-dashboard"></i> {{ tr('nav.dashboard') }}
+      </a>
+      {% set in_prospects = request.endpoint in ('prospects_list','prospects_new','prospects_detail','compose','draft_detail','prospects_chat','sequence_new','sequence_detail','briefing') and not request.args.get('type') and not request.args.get('stage') %}
+      <a href="{{ url_for('prospects_list') }}" class="nav-item {% if in_prospects %}active{% endif %}"{% if in_prospects %} aria-current="page"{% endif %}>
+        <i data-lucide="users"></i> {{ tr('nav.all_prospects') }}
+      </a>
+      <a href="{{ url_for('research_index') }}" class="nav-item {% if request.endpoint=='research_index' %}active{% endif %}">
+        <i data-lucide="scan-search"></i> {{ tr('nav.research') }}
+      </a>
+      <a href="{{ url_for('ask_page') }}" class="nav-item {% if request.endpoint=='ask_page' %}active{% endif %}">
+        <i data-lucide="message-square-text"></i> {{ tr('nav.ask') }}
+      </a>
+      <a href="{{ url_for('tasks') }}" class="nav-item {% if request.endpoint=='tasks' %}active{% endif %}">
+        <i data-lucide="check-square"></i> {{ tr('nav.tasks') }}
+        {% if global_tasks_count %}<span class="ml-auto text-[10px] font-bold bg-ink-900 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center">{{ global_tasks_count }}</span>{% endif %}
+      </a>
+      <a href="{{ url_for('activity_feed') }}" class="nav-item {% if request.endpoint=='activity_feed' %}active{% endif %}">
+        <i data-lucide="activity"></i> {{ tr('nav.activity') }}
+      </a>
+    </div>
+
+    <div class="nav-section">{{ tr('nav.section_segments') }}</div>
+    <div class="space-y-1">
+      <a href="{{ url_for('prospects_list', type='individual') }}" class="nav-item {% if request.args.get('type')=='individual' %}active{% endif %}">
+        <i data-lucide="user-round"></i> {{ tr('nav.major_donor') }}
+      </a>
+      <a href="{{ url_for('prospects_list', type='corporate') }}" class="nav-item {% if request.args.get('type')=='corporate' %}active{% endif %}">
+        <i data-lucide="building-2"></i> {{ tr('nav.corporate') }}
+      </a>
+      <a href="{{ url_for('prospects_list', type='foundation') }}" class="nav-item {% if request.args.get('type')=='foundation' %}active{% endif %}">
+        <i data-lucide="landmark"></i> {{ tr('nav.foundations') }}
+      </a>
+    </div>
+
+    <div class="nav-section">{{ tr('nav.section_pipeline') }}</div>
+    <div class="space-y-1">
+      <a href="{{ url_for('prospects_list', stage='qualified') }}" class="nav-item {% if request.args.get('stage')=='qualified' %}active{% endif %}">
+        <i data-lucide="badge-check"></i> {{ tr('nav.qualified') }}
+      </a>
+      <a href="{{ url_for('prospects_list', stage='cultivated') }}" class="nav-item {% if request.args.get('stage')=='cultivated' %}active{% endif %}">
+        <i data-lucide="sprout"></i> {{ tr('nav.cultivation') }}
+      </a>
+      <a href="{{ url_for('prospects_list', stage='solicited') }}" class="nav-item {% if request.args.get('stage')=='solicited' %}active{% endif %}">
+        <i data-lucide="send"></i> {{ tr('nav.solicited') }}
+      </a>
+      <a href="{{ url_for('prospects_list', stage='stewarded') }}" class="nav-item {% if request.args.get('stage')=='stewarded' %}active{% endif %}">
+        <i data-lucide="heart-handshake"></i> {{ tr('nav.steward') }}
+      </a>
+    </div>
+
+    <div class="nav-section">{{ tr('nav.section_tools') }}</div>
+    <div class="space-y-1">
+      <a href="{{ url_for('goals') }}" class="nav-item {% if request.endpoint in ('goals','goals_archive') %}active{% endif %}">
+        <i data-lucide="target"></i> {{ tr('nav.goals') }}
+      </a>
+      <a href="{{ url_for('campaigns') }}" class="nav-item {% if request.endpoint=='campaigns' %}active{% endif %}">
+        <i data-lucide="megaphone"></i> {{ tr('nav.campaigns') }}
+      </a>
+      <a href="{{ url_for('network_global') }}" class="nav-item {% if request.endpoint=='network_global' %}active{% endif %}">
+        <i data-lucide="share-2"></i> {{ tr('nav.network') }}
+      </a>
+      <a href="{{ url_for('duplicates') }}" class="nav-item {% if request.endpoint=='duplicates' %}active{% endif %}">
+        <i data-lucide="copy-check"></i> {{ tr('nav.duplicates') }}
+      </a>
+      <a href="{{ url_for('tags') }}" class="nav-item {% if request.endpoint=='tags' %}active{% endif %}">
+        <i data-lucide="tag"></i> {{ tr('nav.tags') }}
+      </a>
+      <a href="{{ url_for('import_csv') }}" class="nav-item {% if request.endpoint=='import_csv' %}active{% endif %}">
+        <i data-lucide="upload-cloud"></i> {{ tr('nav.import') }}
+      </a>
+      <a href="{{ url_for('email_templates') }}" class="nav-item {% if request.endpoint in ('email_templates','email_templates_edit','email_templates_delete') %}active{% endif %}">
+        <i data-lucide="mail"></i> {{ tr('nav.email_templates') }}
+      </a>
+      <a href="{{ url_for('snippets') }}" class="nav-item {% if request.endpoint=='snippets' %}active{% endif %}">
+        <i data-lucide="copy"></i> {{ tr('nav.snippets') }}
+      </a>
+    </div>
+
+    <div class="mt-auto pt-4 border-t border-line space-y-1">
+      <a href="{{ url_for('guide') }}" class="nav-item {% if request.endpoint=='guide' %}active{% endif %}">
+        <i data-lucide="book-open"></i> {{ tr('nav.guide') }}
+      </a>
+      <a href="{{ url_for('organization') }}" class="nav-item {% if request.endpoint=='organization' %}active{% endif %}">
+        <i data-lucide="briefcase"></i> {{ tr('nav.org') }}
+        {% if not org_ctx or not org_ctx.name %}<span class="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500" title="{{ tr('nav.org_setup_hint') }}" aria-label="{{ tr('nav.org_setup_hint') }}" role="img"></span>{% endif %}
+      </a>
+      <a href="{{ url_for('export_csv') }}" class="nav-item">
+        <i data-lucide="download"></i> {{ tr('nav.export') }}
+      </a>
+      <a href="{{ url_for('usage') }}" class="nav-item {% if request.endpoint=='usage' %}active{% endif %}">
+        <i data-lucide="gauge"></i> {{ tr('nav.usage') }}
+      </a>
+      <a href="{{ url_for('trash') }}" class="nav-item {% if request.endpoint=='trash' %}active{% endif %}">
+        <i data-lucide="trash-2"></i> {{ tr('nav.trash') }}
+      </a>
+      <a href="{{ url_for('settings') }}" class="nav-item {% if request.endpoint=='settings' %}active{% endif %}">
+        <i data-lucide="settings-2"></i> {{ tr('nav.settings') }}
+      </a>
+      <div class="flex items-center gap-1 px-3 pt-2">
+        <i data-lucide="languages" class="w-3.5 h-3.5 text-ink-400"></i>
+        {% for code in LANGS %}
+        <a href="{{ url_for('set_lang', code=code) }}"
+           class="text-[11px] font-semibold px-1.5 py-0.5 rounded {% if lang==code %}bg-ink-900 text-white{% else %}text-ink-500 hover:text-ink-900{% endif %}">{{ code|upper }}</a>
+        {% endfor %}
+        <span class="ml-auto text-[10px] text-ink-400 font-mono" title="Forager v{{ app_version }}">v{{ app_version }}</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main id="main" tabindex="-1" class="min-w-0 flex flex-col bg-white border-l border-line focus:outline-none">
+
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-line">
+      <div class="flex items-center gap-2.5 md:gap-3 px-4 md:px-8 py-3">
+        <button type="button" @click="nav=true" class="btn-ghost btn-sm !px-2 lg:hidden tap" aria-label="{{ tr('a11y.open_menu') }}">
+          <i data-lucide="menu" class="w-4 h-4"></i>
+        </button>
+        {# min-w-0: senza, la larghezza minima intrinseca dell'input forza l'header (e l'intera pagina) oltre il viewport mobile #}
+        <form action="{{ url_for('prospects_list') }}" method="get" class="flex-1 min-w-0 max-w-xl relative" role="search">
+          <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none"></i>
+          <label for="hdr-search" class="sr-only">{{ tr('header.search_ph') }}</label>
+          <input id="hdr-search" type="search" name="q" value="{{ request.args.get('q','') }}"
+                 placeholder="{{ tr('header.search_ph') }}"
+                 class="!pl-9 !py-2 !text-[13.5px] !bg-ink-50 !border-line">
+          <kbd class="absolute right-3 top-1/2 -translate-y-1/2 hidden md:inline-flex" title="{{ tr('header.search_ph') }}">/</kbd>
+        </form>
+        <button type="button" @click="$dispatch('open-palette')" class="btn-ghost btn-sm !px-2.5 hidden sm:inline-flex" title="{{ tr('header.open_palette') }}" aria-label="{{ tr('header.open_palette') }}">
+          <i data-lucide="command" class="w-3.5 h-3.5"></i>
+          <span class="font-mono text-[11px] tracking-tight">K</span>
+        </button>
+        <a href="{{ url_for('research_index') }}" class="btn-primary btn-sm" title="{{ tr('header.new_research') }}">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          <span class="hidden md:inline">{{ tr('header.new_research') }}</span>
+        </a>
+        <div x-data="{ acct:false }" class="relative pl-2.5 ml-0.5 border-l border-line">
+          <button type="button" @click="acct=!acct" @click.outside="acct=false" class="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-ink-100 transition" :aria-expanded="acct" aria-haspopup="menu" aria-label="{{ tr('header.account') }}">
+            <img src="{{ url_for('avatar_svg', name=(org_ctx.fundraiser_name or org_ctx.name or 'Fundraiser') if org_ctx else 'Fundraiser', ptype='individual', size=64) }}" class="av av-sm" alt="">
+            <span class="text-[12.5px] text-ink-700 font-medium hidden md:inline max-w-[140px] truncate">{{ (org_ctx.name if org_ctx and org_ctx.name else 'fundraiser@local') }}</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-ink-400 hidden md:inline"></i>
+          </button>
+          <div x-show="acct" x-cloak x-transition.origin.top.right
+               class="absolute right-0 mt-2 w-60 bg-white border border-line rounded-xl shadow-xl py-1.5 z-50" role="menu">
+            {% if org_ctx and org_ctx.name %}
+            <div class="px-3 py-2 mb-1 border-b border-line">
+              <div class="text-[13px] font-semibold text-ink-900 truncate">{{ org_ctx.name }}</div>
+              {% if org_ctx.legal_form %}<div class="text-[11px] text-ink-500">{{ org_ctx.legal_form }}</div>{% endif %}
+            </div>
+            {% endif %}
+            <a href="{{ url_for('organization') }}" class="flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50" role="menuitem"><i data-lucide="briefcase" class="w-4 h-4 text-ink-400"></i> {{ tr('nav.org') }}{% if not org_ctx or not org_ctx.name %}<span class="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500"></span>{% endif %}</a>
+            <a href="{{ url_for('settings') }}" class="flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50" role="menuitem"><i data-lucide="settings-2" class="w-4 h-4 text-ink-400"></i> {{ tr('nav.settings') }}</a>
+            <a href="{{ url_for('usage') }}" class="flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50" role="menuitem"><i data-lucide="gauge" class="w-4 h-4 text-ink-400"></i> {{ tr('nav.usage') }}</a>
+            <a href="{{ url_for('export_csv') }}" class="flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink-700 hover:bg-ink-50" role="menuitem"><i data-lucide="download" class="w-4 h-4 text-ink-400"></i> {{ tr('nav.export') }}</a>
+            <div class="flex items-center gap-1 px-3 pt-2 mt-1 border-t border-line">
+              <i data-lucide="languages" class="w-3.5 h-3.5 text-ink-400"></i>
+              {% for code in LANGS %}
+              <a href="{{ url_for('set_lang', code=code) }}" class="text-[11px] font-semibold px-1.5 py-0.5 rounded {% if lang==code %}bg-ink-900 text-white{% else %}text-ink-500 hover:text-ink-900{% endif %}">{{ code|upper }}</a>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {% if not claude_ok %}
+    <div class="bg-amber-50 border-b border-amber-200 px-4 md:px-8 py-2.5 flex items-center gap-2.5 text-[13px] text-amber-900">
+      <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 text-amber-600"></i>
+      <span>{{ tr('claude.missing_banner') }}</span>
+      <a href="https://docs.claude.com/claude-code" target="_blank" rel="noopener" class="font-semibold underline underline-offset-2 shrink-0">{{ tr('claude.missing_link') }}</a>
+    </div>
+    {% endif %}
+
+    <div class="flex-1 max-w-[1320px] w-full mx-auto px-4 md:px-8 py-6 md:py-8 fade-in">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <script>window.__flashes = [{% for cat, msg in messages %}{type: {{ ('success' if cat=='success' else 'error')|tojson }}, msg: {{ msg|tojson }}},{% endfor %}];</script>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+
+  </main>
+</div>
+
+<!-- OVERLAY ATTESA (azioni AI sincrone lunghe) -->
+<div id="busyOverlay" class="fixed inset-0 z-[70] hidden items-center justify-center bg-white/70 backdrop-blur-[2px]">
+  <div class="bg-white border border-line rounded-2xl shadow-xl px-7 py-6 max-w-sm text-center mx-4">
+    <span class="spinner !w-7 !h-7 mx-auto mb-3 block"></span>
+    <div class="text-[14px] font-semibold text-ink-900" id="busyOverlayText">{{ tr('busy.title') }}</div>
+    <div class="text-[12.5px] text-ink-500 mt-1">{{ tr('busy.sub') }}</div>
+  </div>
+</div>
+
+<!-- TOAST (feedback non bloccante, auto-dismiss) -->
+<div id="toastWrap" aria-live="polite" aria-atomic="false"
+     class="fixed z-[80] bottom-4 right-4 left-4 sm:left-auto sm:max-w-sm flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- MODALE DI CONFERMA (sostituisce confirm() nativo) -->
+<div x-data="confirmDialog()" @open-confirm.window="show($event.detail)" x-cloak>
+  <div x-show="open" x-transition.opacity class="fixed inset-0 z-[90]" style="display:none">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px]" @click="cancel()"></div>
+    <div class="relative max-w-sm mx-auto mt-[28vh] bg-white rounded-2xl shadow-2xl border border-line p-6 mx-4 sm:mx-auto"
+         @keydown.escape.window="cancel()" role="alertdialog" aria-modal="true">
+      <div class="flex items-start gap-3.5">
+        <div class="w-10 h-10 rounded-xl grid place-items-center shrink-0" :class="danger ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-ink-100 text-ink-700'">
+          <i :data-lucide="danger ? 'alert-triangle' : 'help-circle'" class="w-5 h-5"></i>
+        </div>
+        <div class="min-w-0 pt-0.5">
+          <h3 class="text-[15px] font-semibold text-ink-900" x-text="title"></h3>
+          <p class="text-[13px] text-ink-600 mt-1 leading-relaxed" x-text="body" x-show="body"></p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button type="button" @click="cancel()" class="btn-ghost btn-sm" x-ref="cancelBtn">{{ tr('common.cancel') }}</button>
+        <button type="button" @click="confirm()" :class="danger ? 'btn-danger' : 'btn-primary btn-sm'" x-text="confirmLabel"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMMAND PALETTE (⌘K / Ctrl+K) -->
+<div x-data="palette()" @keydown.window="onKey($event)" @open-palette.window="show()" x-cloak>
+  <div x-show="open" x-transition.opacity class="fixed inset-0 z-[60]" style="display:none">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-[1px]" @click="close()"></div>
+    <div class="relative max-w-xl mx-auto mt-[11vh] bg-white rounded-2xl shadow-2xl border border-line overflow-hidden mx-4 sm:mx-auto">
+      <div class="flex items-center gap-2.5 px-4 border-b border-line">
+        <i data-lucide="search" class="w-4 h-4 text-ink-400 shrink-0"></i>
+        <input x-ref="inp" x-model="q" @input.debounce.150ms="search()"
+               @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)" @keydown.enter.prevent="go()"
+               placeholder="{{ tr('palette.ph') }}"
+               class="!border-0 !shadow-none !bg-transparent !px-0 !py-3.5 !text-[15px] flex-1" autocomplete="off">
+        <kbd class="shrink-0">esc</kbd>
+      </div>
+      <div class="max-h-[52vh] overflow-y-auto py-2">
+        <template x-if="loading"><div class="px-4 py-3 text-ink-400 text-[13px]">{{ tr('palette.searching') }}</div></template>
+        <template x-for="(it,i) in results" :key="it.key">
+          <a :href="it.url" @mouseenter="active=i" @click="close()"
+             :class="active===i ? 'bg-ink-100' : ''"
+             class="flex items-center gap-3 px-4 py-2.5 no-underline text-ink-900">
+            <template x-if="it.isProspect">
+              <img :src="it.avatar" class="av av-sm" :alt="it.name">
+            </template>
+            <template x-if="!it.isProspect">
+              <span class="w-[26px] h-[26px] rounded-lg bg-ink-100 grid place-items-center shrink-0">
+                <i :data-lucide="it.icon" class="w-3.5 h-3.5 text-ink-600"></i>
+              </span>
+            </template>
+            <div class="min-w-0 flex-1">
+              <div class="text-[13.5px] font-semibold truncate" x-text="it.name || it.label"></div>
+              <div x-show="it.subtitle" class="text-[11.5px] text-ink-500 truncate" x-text="it.subtitle"></div>
+            </div>
+            <span x-show="it.stage" class="b b-slate !text-[10px]" x-text="it.stage"></span>
+          </a>
+        </template>
+        <template x-if="!loading && results.length===0">
+          <div class="px-4 py-8 text-center text-ink-400 text-[13px]">{{ tr('palette.no_results') }} "<span x-text="q"></span>"</div>
+        </template>
+      </div>
+      <div class="flex items-center gap-3 px-4 py-2 border-t border-line text-[11px] text-ink-400">
+        <span><kbd>↑</kbd><kbd>↓</kbd> {{ tr('palette.navigate') }}</span><span><kbd>↵</kbd> {{ tr('palette.open') }}</span><span class="ml-auto">Forager</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---- CSRF: token in ogni form POST + header su ogni fetch POST same-origin ----
+  (function(){
+    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    if (!token) return;
+    // form HTML classici: inietta hidden input al submit (copre anche form aggiunti dinamicamente)
+    document.addEventListener('submit', function(e){
+      const f = e.target;
+      if (!(f instanceof HTMLFormElement)) return;
+      if ((f.method || '').toLowerCase() !== 'post') return;
+      if (!f.querySelector('input[name="csrf_token"]')) {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'csrf_token'; inp.value = token;
+        f.appendChild(inp);
+      }
+    }, true);
+    // fetch: aggiungi header X-CSRFToken alle richieste mutanti same-origin
+    const _fetch = window.fetch;
+    window.fetch = function(input, init){
+      init = init || {};
+      const method = (init.method || (input && input.method) || 'GET').toUpperCase();
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      const sameOrigin = !/^https?:\/\//i.test(url) || url.startsWith(window.location.origin);
+      if (sameOrigin && method !== 'GET' && method !== 'HEAD') {
+        const h = new Headers(init.headers || (input && input.headers) || {});
+        if (!h.has('X-CSRFToken')) h.set('X-CSRFToken', token);
+        init.headers = h;
+      }
+      return _fetch.call(this, input, init);
+    };
+  })();
+
+  function refreshIcons() { if (window.lucide) lucide.createIcons(); }
+  document.addEventListener('DOMContentLoaded', refreshIcons);
+  document.body.addEventListener('htmx:afterSwap', refreshIcons);
+
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea, select')) return;
+    if (e.key === '/') { e.preventDefault(); document.querySelector('input[type=search]')?.focus(); }
+  });
+
+  // Command palette ⌘K
+  function palette() {
+    const defaults = () => ([
+      { key:'a-new',   label:'{{ tr("palette.a_new") }}', icon:'sparkles',          url:'{{ url_for("research_index") }}' },
+      { key:'a-dash',  label:'{{ tr("nav.dashboard") }}',              icon:'layout-dashboard',  url:'{{ url_for("dashboard") }}' },
+      { key:'a-all',   label:'{{ tr("nav.all_prospects") }}',       icon:'users',             url:'{{ url_for("prospects_list") }}' },
+      { key:'a-tasks', label:'{{ tr("nav.tasks") }}',                  icon:'check-square',      url:'{{ url_for("tasks") }}' },
+      { key:'a-net',   label:'{{ tr("nav.network") }}',          icon:'share-2',           url:'{{ url_for("network_global") }}' },
+      { key:'a-goals', label:'{{ tr("nav.goals") }}',       icon:'target',            url:'{{ url_for("goals") }}' },
+      { key:'a-imp',   label:'{{ tr("nav.import") }}',             icon:'upload-cloud',      url:'{{ url_for("import_csv") }}' },
+      { key:'a-guide', label:'{{ tr("nav.guide") }}',              icon:'book-open',         url:'{{ url_for("guide") }}' },
+    ]);
+    return {
+      open:false, q:'', loading:false, active:0, prospects:[], actions:defaults(),
+      get results(){ return [...this.prospects, ...this.actions]; },
+      onKey(e){
+        const k = (e.key||'').toLowerCase();
+        if ((e.metaKey||e.ctrlKey) && k==='k'){ e.preventDefault(); this.open ? this.close() : this.show(); }
+        else if (k==='escape' && this.open){ this.close(); }
+      },
+      show(){ this.open=true; this.q=''; this.prospects=[]; this.actions=defaults(); this.active=0;
+              this.$nextTick(()=>{ this.$refs.inp.focus(); refreshIcons(); }); },
+      close(){ this.open=false; },
+      async search(){
+        const q=this.q.trim();
+        this.actions = q ? defaults().filter(a=>a.label.toLowerCase().includes(q.toLowerCase())) : defaults();
+        if(!q){ this.prospects=[]; this.active=0; this.$nextTick(refreshIcons); return; }
+        this.loading=true;
+        try{
+          const r=await fetch('{{ url_for("api_search") }}?q='+encodeURIComponent(q));
+          if(!r.ok) throw new Error('search failed');
+          const d=await r.json();
+          this.prospects=(d.prospects||[]).map(p=>({ ...p, key:'p'+p.id, isProspect:true }));
+        }catch(_){ this.prospects=[]; }
+        this.active=0; this.loading=false; this.$nextTick(refreshIcons);
+      },
+      move(d){ const n=this.results.length; if(n){ this.active=(this.active+d+n)%n; } },
+      go(){ const it=this.results[this.active]; if(it){ window.location=it.url; } },
+    };
+  }
+
+  // ---- TOAST: feedback non bloccante, auto-dismiss ----
+  window.toast = function(msg, opts){
+    opts = opts || {};
+    const type = opts.type || 'info';
+    const wrap = document.getElementById('toastWrap');
+    if (!wrap || !msg) return;
+    const icon = type==='success' ? 'check-circle-2' : (type==='error' ? 'alert-triangle' : 'info');
+    const accent = type==='success' ? 'text-emerald-600' : (type==='error' ? 'text-rose-600' : 'text-ink-700');
+    const el = document.createElement('div');
+    el.className = 'pointer-events-auto flex items-start gap-2.5 bg-white border border-line rounded-xl shadow-xl px-4 py-3 text-[13px] text-ink-800 translate-y-1 opacity-0 transition-all duration-200';
+    el.setAttribute('role', type==='error' ? 'alert' : 'status');
+    el.innerHTML = '<i data-lucide="'+icon+'" class="w-4 h-4 mt-0.5 shrink-0 '+accent+'"></i><div class="flex-1 leading-snug"></div>'+
+                   '<button type="button" aria-label="{{ tr('a11y.dismiss') }}" class="text-ink-300 hover:text-ink-700 shrink-0 -mr-1"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>';
+    el.querySelector('div').textContent = msg;
+    wrap.appendChild(el);
+    refreshIcons();
+    requestAnimationFrame(()=>{ el.classList.remove('translate-y-1','opacity-0'); });
+    const close = ()=>{ el.classList.add('opacity-0','translate-y-1'); setTimeout(()=>el.remove(), 200); };
+    el.querySelector('button').addEventListener('click', close);
+    if (opts.sticky !== true) setTimeout(close, opts.duration || 4000);
+  };
+
+  // ---- COPIA testo con feedback ----
+  window.copyText = async function(text, okMsg){
+    try { await navigator.clipboard.writeText(text); window.toast(okMsg || 'Copiato', {type:'success'}); }
+    catch(_) {
+      try { const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); window.toast(okMsg || 'Copiato', {type:'success'}); }
+      catch(e){ window.toast('Copia non riuscita', {type:'error'}); }
+    }
+  };
+
+  // ---- MODALE DI CONFERMA (Alpine) ----
+  function confirmDialog(){
+    return {
+      open:false, title:'', body:'', confirmLabel:'{{ tr('confirm.confirm') }}', danger:false,
+      _form:null, _submitter:null, _onConfirm:null,
+      show(d){ d=d||{};
+        this.title=d.title||'{{ tr('confirm.title') }}'; this.body=d.body||'';
+        this.confirmLabel=d.confirmLabel||'{{ tr('confirm.confirm') }}'; this.danger=!!d.danger;
+        this._form=d.form||null; this._submitter=d.submitter||null; this._onConfirm=d.onConfirm||null;
+        this.open=true; this.$nextTick(()=>{ refreshIcons(); this.$refs.cancelBtn && this.$refs.cancelBtn.focus(); });
+      },
+      cancel(){ this.open=false; this._form=this._submitter=this._onConfirm=null; },
+      confirm(){
+        const f=this._form, s=this._submitter, cb=this._onConfirm;
+        this.open=false; this._form=this._submitter=this._onConfirm=null;
+        if (cb) { try{ cb(); }catch(_){} }
+        if (f) { f.dataset.confirmed='1'; if (f.requestSubmit) f.requestSubmit(s||undefined); else f.submit(); }
+      },
+    };
+  }
+  // API JS per chiamanti programmatici
+  window.confirmAction = function(opts){ window.dispatchEvent(new CustomEvent('open-confirm', {detail: opts||{}})); };
+
+  // ---- SUBMIT: conferma non-nativa + spinner inline (no doppio submit) + overlay solo per data-busy ----
+  function isHtmxForm(f){ for (const a of f.attributes) if (a.name.startsWith('hx-')) return true; return false; }
+  document.addEventListener('submit', e => {
+    const f = e.target;
+    if (!(f instanceof HTMLFormElement)) return;
+    const submitter = e.submitter || f.querySelector('button[type=submit], button:not([type])');
+
+    // 1) conferma non-nativa: data-confirm sul form OPPURE sul bottone cliccato (se non già confermata)
+    const confEl = (submitter && submitter.hasAttribute && submitter.hasAttribute('data-confirm'))
+                   ? submitter : (f.hasAttribute('data-confirm') ? f : null);
+    if (confEl && f.dataset.confirmed !== '1') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('open-confirm', {detail: {
+        title: confEl.getAttribute('data-confirm-title') || undefined,
+        body: confEl.getAttribute('data-confirm'),
+        danger: confEl.hasAttribute('data-confirm-danger'),
+        confirmLabel: confEl.getAttribute('data-confirm-label') || undefined,
+        form: f, submitter: submitter,
+      }}));
+      return;
+    }
+    delete f.dataset.confirmed;
+    if (isHtmxForm(f)) return; // htmx gestisce i propri indicatori
+
+    // 2) blocco doppio submit
+    if (f.dataset.submitting === '1') { e.preventDefault(); return; }
+    f.dataset.submitting = '1';
+    setTimeout(()=>{ delete f.dataset.submitting; }, 8000);
+
+    // 3) spinner inline sul bottone cliccato (senza disabilitarlo: ne preserva name/value)
+    const isPost = (f.method || '').toLowerCase() === 'post';
+    if (isPost && submitter && !submitter.dataset._busy) {
+      submitter.dataset._busy = '1';
+      const txt = submitter.getAttribute('data-busy-text') || f.getAttribute('data-busy-text');
+      submitter.style.pointerEvents = 'none';
+      submitter.dataset._html = submitter.innerHTML;
+      submitter.innerHTML = '<span class="spinner"></span>' + (txt ? ' ' + txt : '');
+    }
+
+    // 4) overlay full-screen SOLO per le azioni AI lunghe marcate data-busy
+    if (f.hasAttribute('data-busy')) {
+      const ov = document.getElementById('busyOverlay');
+      if (ov) {
+        const label = document.getElementById('busyOverlayText');
+        const t = f.getAttribute('data-busy-text');
+        if (label && t) label.textContent = t.replace(/…$/, '') + '…';
+        ov.classList.remove('hidden'); ov.classList.add('flex');
+      }
+    }
+  }, true);
+
+  // Ripristino allo show (bfcache / back): nascondi overlay e ripristina bottoni
+  window.addEventListener('pageshow', () => {
+    const ov = document.getElementById('busyOverlay');
+    if (ov) { ov.classList.add('hidden'); ov.classList.remove('flex'); }
+    document.querySelectorAll('[data-_busy]').forEach(b => {
+      if (b.dataset._html !== undefined) b.innerHTML = b.dataset._html;
+      b.style.pointerEvents = ''; delete b.dataset._busy; delete b.dataset._html;
+    });
+  });
+
+  // ---- flash dal server → toast ----
+  document.addEventListener('DOMContentLoaded', () => {
+    (window.__flashes || []).forEach(fl => window.toast(fl.msg, {type: fl.type}));
+  });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

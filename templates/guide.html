@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}{{ tr('guide.title') }} · Forager{% endblock %}
+{% block content %}
+
+<div x-data="guideFilter()" class="max-w-[1100px]">
+
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+    <div>
+      <div class="text-[12px] font-medium text-ink-400 mb-1">{{ tr('guide.eyebrow') }}</div>
+      <h1 class="t-h1">{{ tr('guide.title') }}</h1>
+      <p class="text-[13.5px] text-ink-500 mt-1 max-w-xl">{{ tr('guide.subtitle') }}</p>
+    </div>
+    <div class="relative w-full sm:w-72 shrink-0">
+      <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none"></i>
+      <input type="search" x-model="q" @input.debounce.120ms="apply()"
+             placeholder="{{ tr('guide.search_ph') }}" class="!pl-9 !py-2 !text-[13.5px]" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="lg:grid lg:grid-cols-[220px_1fr] lg:gap-8 items-start">
+
+    <!-- TOC: sticky a sinistra su desktop, chip orizzontali su mobile -->
+    <nav class="lg:sticky lg:top-[72px] mb-5 lg:mb-0 -mx-4 px-4 lg:mx-0 lg:px-0" aria-label="{{ tr('guide.toc') }}">
+      <div class="hidden lg:block text-[10.5px] font-semibold text-ink-400 uppercase tracking-[.1em] mb-2 px-2">{{ tr('guide.toc') }}</div>
+      <div class="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
+        {% for sec in guide %}
+        <a href="#g-{{ sec.id }}" x-show="visible['{{ sec.id }}'] !== false"
+           class="nav-item !py-1.5 shrink-0 lg:shrink whitespace-nowrap text-[13px]">
+          <i data-lucide="{{ sec.icon }}"></i> {{ sec.title[lang] }}
+        </a>
+        {% endfor %}
+      </div>
+    </nav>
+
+    <!-- SEZIONI -->
+    <div class="space-y-5 min-w-0">
+
+      <template x-if="noResults">
+        <div class="bg-white border border-line rounded-xl px-6 py-12 text-center">
+          <i data-lucide="search-x" class="w-7 h-7 text-ink-300 mx-auto mb-3"></i>
+          <div class="text-[14px] font-semibold text-ink-900">{{ tr('guide.no_results') }}</div>
+          <div class="text-[12.5px] text-ink-500 mt-1">{{ tr('guide.no_results_hint') }}</div>
+        </div>
+      </template>
+
+      {% for sec in guide %}
+      <section id="g-{{ sec.id }}" data-guide-section="{{ sec.id }}"
+               class="bg-white border border-line rounded-xl overflow-hidden scroll-mt-[76px]">
+        <div class="px-5 md:px-6 py-4 border-b border-line flex items-start gap-3.5">
+          <span class="w-9 h-9 rounded-lg bg-ink-900 text-white grid place-items-center shrink-0 mt-0.5">
+            <i data-lucide="{{ sec.icon }}" class="w-4.5 h-4.5" style="width:18px;height:18px"></i>
+          </span>
+          <div class="min-w-0">
+            <h2 class="t-h2">{{ sec.title[lang] }}</h2>
+            <p class="text-[12.5px] text-ink-500 mt-0.5 leading-relaxed">{{ sec.intro[lang] }}</p>
+          </div>
+        </div>
+
+        <div class="divide-y divide-ink-100">
+          {% for blk in sec.blocks %}
+          <details class="group guide-block" data-guide-block>
+            <summary class="flex items-center gap-3 px-5 md:px-6 py-3.5 cursor-pointer select-none hover:bg-ink-50/60 transition">
+              <i data-lucide="chevron-right" class="w-4 h-4 text-ink-400 shrink-0 transition-transform duration-200 group-open:rotate-90"></i>
+              <span class="text-[13.5px] font-semibold text-ink-900">{{ blk.q[lang] }}</span>
+            </summary>
+            <div class="px-5 md:px-6 pb-4 pl-[52px] md:pl-[56px]">
+              <p class="text-[13px] text-ink-600 leading-relaxed">{{ blk.a[lang]|safe }}</p>
+            </div>
+          </details>
+          {% endfor %}
+        </div>
+
+        {% if sec.tip %}
+        <div class="mx-5 md:mx-6 mb-5 mt-1 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <i data-lucide="lightbulb" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+          <div class="text-[12.5px] text-amber-900 leading-relaxed"><b>{{ tr('guide.tip_label') }}</b> — {{ sec.tip[lang] }}</div>
+        </div>
+        {% endif %}
+      </section>
+      {% endfor %}
+
+      <div class="text-center text-[12px] text-ink-400 py-4">
+        {{ tr('guide.footer') }} <kbd>⌘K</kbd>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function guideFilter() {
+    return {
+      q: '',
+      visible: {},
+      noResults: false,
+      apply() {
+        const q = this.q.trim().toLowerCase();
+        const vis = {};
+        let any = false;
+        document.querySelectorAll('[data-guide-section]').forEach(sec => {
+          let secAny = false;
+          sec.querySelectorAll('[data-guide-block]').forEach(blk => {
+            const hit = !q || blk.textContent.toLowerCase().includes(q);
+            blk.style.display = hit ? '' : 'none';
+            if (hit) secAny = true;
+            // apri i blocchi trovati durante una ricerca, richiudili quando si svuota
+            if (q && hit) blk.setAttribute('open', ''); else if (!q) blk.removeAttribute('open');
+          });
+          // l'intro/titolo sezione conta come match anche se nessun blocco combacia
+          if (q && !secAny) {
+            const head = sec.querySelector('h2, p');
+            const headTxt = (sec.querySelector('h2')?.textContent + ' ' + (sec.querySelector('p')?.textContent || '')).toLowerCase();
+            secAny = headTxt.includes(q);
+          }
+          sec.style.display = secAny ? '' : 'none';
+          vis[sec.dataset.guideSection] = secAny;
+          if (secAny) any = true;
+        });
+        this.visible = vis;
+        this.noResults = !any;
+      },
+    };
+  }
+</script>
+{% endblock %}

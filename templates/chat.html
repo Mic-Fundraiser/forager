@@ -1,0 +1,438 @@
+{% extends 'base.html' %}
+{% block title %}{{ tr('chat.title') }} · {{ p.full_name }}{% endblock %}
+{% block content %}
+
+<div class="text-[12px] font-medium text-ink-400 mb-3">
+  <a href="{{ url_for('prospects_detail', pid=p.id) }}" class="hover:text-ink-700">{{ p.full_name }}</a>
+  <span class="text-ink-300 mx-1">/</span>
+  <span class="text-ink-700">{{ tr('chat.breadcrumb') }}</span>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-6">
+
+  <div class="bg-white border border-line rounded-2xl overflow-hidden flex flex-col relative" style="height:calc(100vh - 180px)">
+    <div class="px-5 py-3 border-b border-line flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0 flex-1">
+        <img class="av shrink-0" src="{{ avatar_url(p.full_name, p.photo_url, p.type, domain_from(p.website)) }}">
+        <div class="min-w-0">
+          <div class="font-semibold text-[14px] truncate">{{ p.full_name }}</div>
+          <div class="text-[11px] text-ink-500 truncate">{{ p.role or p.headline or TYPE_LABELS.get(p.type, p.type) }}</div>
+        </div>
+      </div>
+      <button type="button" onclick="clearChat()" class="text-[12px] text-ink-500 hover:text-rose-600 inline-flex items-center gap-1 shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> {{ tr('chat.clear') }}</button>
+    </div>
+
+    <div id="chatMessages" class="flex-1 overflow-y-auto p-6 space-y-4">
+      {% if not messages %}
+      <div class="text-center text-[13px] text-ink-500 py-10">
+        <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-ink-100 grid place-items-center text-ink-700">
+          <i data-lucide="message-circle"></i>
+        </div>
+        {{ tr('chat.empty_before') }} {{ p.full_name }}.
+      </div>
+      {% endif %}
+      {% for m in messages %}
+        <div class="msg {{ m.role }}">
+          {% if m.role == 'assistant' %}<div class="msg-avatar bg-ink-900 text-white"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i></div>{% endif %}
+          <div class="msg-bubble">{% if m.role == 'assistant' %}{{ m.content|md }}{% else %}{{ m.content }}{% endif %}</div>
+          {% if m.role == 'user' %}<div class="msg-avatar bg-ink-100 text-ink-700">{{ tr('chat.you') }}</div>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- pulsante "torna in fondo" quando si scrolla su -->
+    <button id="toBottom" type="button" onclick="scrollToBottom(true)"
+            class="hidden absolute left-1/2 -translate-x-1/2 bottom-[84px] z-10 bg-ink-900 text-white text-[11px] font-semibold rounded-full px-3 py-1.5 shadow-lg inline-flex items-center gap-1">
+      <i data-lucide="arrow-down" class="w-3 h-3"></i> {{ tr('chat.new_messages') }}
+    </button>
+
+    <div class="p-4 border-t border-line bg-ink-50">
+      <form onsubmit="sendMsg(event)" class="flex items-end gap-2">
+        <textarea id="chatInput" rows="1" placeholder="{{ tr('chat.input_placeholder') }}"
+                  autofocus class="!py-3 !text-[14px] !bg-white resize-none leading-snug" style="max-height:160px"></textarea>
+        <button id="stopBtn" type="button" onclick="stopGen()" class="btn-ghost shrink-0" style="display:none" title="{{ tr('chat.stop') }}"><i data-lucide="square" class="w-4 h-4"></i></button>
+        <button id="sendBtn" type="submit" class="btn-primary shrink-0" title="{{ tr('chat.send') }}"><i data-lucide="arrow-up" class="w-4 h-4"></i></button>
+      </form>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <div class="bg-white border border-line rounded-xl p-5">
+      <h3 class="text-[12px] font-bold uppercase tracking-wider text-ink-500 mb-3">{{ tr('chat.suggestions') }}</h3>
+      <div class="space-y-2">
+        <button type="button" onclick="askQuick('{{ tr('chat.suggest_ask_amount_q') }}')" class="suggest">{{ tr('chat.suggest_ask_amount') }}</button>
+        <button type="button" onclick="askQuick('{{ tr('chat.suggest_angle_q') }}')" class="suggest">{{ tr('chat.suggest_angle') }}</button>
+        <button type="button" onclick="askQuick('{{ tr('chat.suggest_talking_points_q') }}')" class="suggest">{{ tr('chat.suggest_talking_points') }}</button>
+        <button type="button" onclick="askQuick('{{ tr('chat.suggest_risks_q') }}')" class="suggest">{{ tr('chat.suggest_risks') }}</button>
+        <button type="button" onclick="askQuick('{{ tr('chat.suggest_intro_q') }}')" class="suggest">{{ tr('chat.suggest_intro') }}</button>
+        <button type="button" onclick="askQuick('{{ tr('chat.suggest_cold_email_q') }}')" class="suggest">{{ tr('chat.suggest_cold_email') }}</button>
+      </div>
+    </div>
+
+    <div class="bg-white border border-line rounded-xl p-5" x-data="chatActions()">
+      <h3 class="text-[12px] font-bold uppercase tracking-wider text-ink-500 mb-3">{{ tr('chat.quick_actions') }}</h3>
+      <div class="space-y-2" x-show="mode===null">
+        <button type="button" @click="mode='task'" class="suggest flex items-center gap-2"><i data-lucide="check-square" class="w-3.5 h-3.5"></i> {{ tr('chat.action_create_task') }}</button>
+        <button type="button" @click="mode='stage'" class="suggest flex items-center gap-2"><i data-lucide="git-branch" class="w-3.5 h-3.5"></i> {{ tr('chat.action_change_stage') }}</button>
+        <button type="button" @click="mode='note'" class="suggest flex items-center gap-2"><i data-lucide="sticky-note" class="w-3.5 h-3.5"></i> {{ tr('chat.action_add_note') }}</button>
+        <a href="{{ url_for('compose', pid=p.id) }}" class="suggest flex items-center gap-2"><i data-lucide="mail" class="w-3.5 h-3.5"></i> {{ tr('chat.action_write_email') }}</a>
+      </div>
+
+      <div x-show="mode==='task'" x-cloak class="space-y-2">
+        <input x-model="taskTitle" placeholder="{{ tr('chat.task_title_placeholder') }}" class="!py-2 !text-[13px]">
+        <input type="date" x-model="taskDue" class="!py-2 !text-[13px]">
+        <div class="flex gap-2">
+          <button type="button" @click="run('create_task',{title:taskTitle,due_date:taskDue})" :disabled="!taskTitle.trim()" class="btn-primary btn-sm flex-1 !justify-center">{{ tr('chat.create_task') }}</button>
+          <button type="button" @click="cancel()" class="btn-ghost btn-sm">{{ tr('chat.cancel') }}</button>
+        </div>
+      </div>
+
+      <div x-show="mode==='stage'" x-cloak class="space-y-2">
+        <select x-model="stage" class="!py-2 !text-[13px]">
+          {% for s in STAGES %}<option value="{{ s }}" {% if p.stage==s %}selected{% endif %}>{{ STAGE_LABELS[s] }}</option>{% endfor %}
+        </select>
+        <div class="flex gap-2">
+          <button type="button" @click="run('change_stage',{stage:stage})" class="btn-primary btn-sm flex-1 !justify-center">{{ tr('chat.apply') }}</button>
+          <button type="button" @click="cancel()" class="btn-ghost btn-sm">{{ tr('chat.cancel') }}</button>
+        </div>
+      </div>
+
+      <div x-show="mode==='note'" x-cloak class="space-y-2">
+        <textarea x-model="noteText" placeholder="{{ tr('chat.note_placeholder') }}" class="!text-[13px]" style="min-height:70px"></textarea>
+        <div class="flex gap-2">
+          <button type="button" @click="run('add_note',{body:noteText})" :disabled="!noteText.trim()" class="btn-primary btn-sm flex-1 !justify-center">{{ tr('chat.save_note') }}</button>
+          <button type="button" @click="cancel()" class="btn-ghost btn-sm">{{ tr('chat.cancel') }}</button>
+        </div>
+      </div>
+
+      <p x-show="err" x-cloak x-text="err" class="text-[12px] text-rose-600 mt-2"></p>
+    </div>
+  </div>
+
+</div>
+
+<style>
+.msg { display: flex; align-items: flex-start; gap: 10px; }
+.msg.user { flex-direction: row-reverse; }
+.msg-avatar { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.msg-bubble {
+  max-width: 78%;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 14px; line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.msg.user .msg-bubble { background: var(--ink-900); color: white; border-bottom-right-radius: 4px; white-space: pre-wrap; }
+.msg.assistant .msg-bubble { background: white; border: 1px solid var(--line); border-bottom-left-radius: 4px; color: var(--ink-900); box-shadow: 0 1px 2px rgba(0,0,0,.02); position: relative; }
+.copy-btn {
+  position: absolute; top: 6px; right: 6px;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  background: var(--ink-50); border: 1px solid var(--line); border-radius: 6px;
+  color: var(--ink-500); cursor: pointer;
+  opacity: 0; transition: opacity .12s, color .12s;
+}
+.msg.assistant .msg-bubble:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { color: var(--ink-900); }
+.msg.assistant .msg-bubble.streaming { white-space: pre-wrap; }
+.msg-bubble p { margin: 0 0 10px; }
+.msg-bubble p:last-child { margin-bottom: 0; }
+.msg-bubble ul, .msg-bubble ol { margin: 6px 0 10px; padding-left: 22px; }
+.msg-bubble li { margin-bottom: 3px; }
+.msg-bubble li:last-child { margin-bottom: 0; }
+.msg-bubble h2, .msg-bubble h3, .msg-bubble h4 { margin: 12px 0 6px; font-weight: 700; font-size: 14.5px; }
+.msg-bubble h2:first-child, .msg-bubble h3:first-child, .msg-bubble h4:first-child { margin-top: 0; }
+.msg-bubble code { background: rgba(0,0,0,.06); padding: 1px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
+.msg-bubble pre { background: #18181b; color: #f4f4f5; padding: 10px 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+.msg-bubble pre code { background: transparent; padding: 0; color: inherit; font-size: 12px; }
+.msg-bubble strong { font-weight: 700; }
+.msg-bubble em { font-style: italic; }
+.msg-bubble a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.msg-bubble blockquote { border-left: 3px solid var(--ink-300); padding-left: 10px; color: var(--ink-600); margin: 8px 0; }
+.msg-bubble .cursor {
+  display: inline-block; width: 2px; height: 1em;
+  background: currentColor; margin-left: 1px;
+  animation: blink 1s steps(2) infinite;
+  vertical-align: text-bottom; opacity: .8;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.suggest {
+  display: block; width: 100%;
+  text-align: left;
+  background: var(--ink-50);
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: var(--ink-700);
+}
+.suggest:hover { background: white; border-color: var(--ink-900); color: var(--ink-900); }
+.typing { display: inline-flex; gap: 4px; }
+.typing span { width: 6px; height: 6px; border-radius: 999px; background: var(--ink-400); animation: typing 1.2s infinite; }
+.typing span:nth-child(2) { animation-delay: .15s; }
+.typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes typing { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+</style>
+
+<script>
+const PROSPECT_ID = {{ p.id }};
+const msgList = document.getElementById('chatMessages');
+const input = document.getElementById('chatInput');
+let currentAbort = null;      // AbortController della risposta in corso
+let lastUserMsg = '';         // per "Riprova"
+
+function escapeHtml(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// --- Scroll intelligente: segue solo se sei già in fondo, altrimenti mostra "Nuovi messaggi" ---
+function nearBottom() { return msgList.scrollHeight - msgList.scrollTop - msgList.clientHeight < 80; }
+function scrollToBottom(force) {
+  if (force || nearBottom()) { msgList.scrollTop = msgList.scrollHeight; document.getElementById('toBottom').classList.add('hidden'); }
+}
+msgList.addEventListener('scroll', () => {
+  document.getElementById('toBottom').classList.toggle('hidden', nearBottom());
+});
+
+// --- Textarea: auto-grow + Invio invia / Shift+Invio a capo ---
+function autoGrow() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 160) + 'px'; }
+input.addEventListener('input', autoGrow);
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(e); }
+});
+
+// --- Copia il testo di una risposta (utile per incollare una bozza email) ---
+function attachCopy(bubble, getText) {
+  if (bubble.querySelector('.copy-btn')) return;
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'copy-btn';
+  b.title = '{{ tr('chat.copy') }}'; b.innerHTML = '<i data-lucide="clipboard-copy" class="w-3 h-3"></i>';
+  b.onclick = () => navigator.clipboard?.writeText(getText()).then(() => {
+    b.innerHTML = '<i data-lucide="check" class="w-3 h-3"></i>'; if (window.lucide) lucide.createIcons();
+    setTimeout(() => { b.innerHTML = '<i data-lucide="clipboard-copy" class="w-3 h-3"></i>'; if (window.lucide) lucide.createIcons(); }, 1500);
+  });
+  bubble.appendChild(b);
+  if (window.lucide) lucide.createIcons();
+}
+// risposte già presenti al caricamento
+document.querySelectorAll('.msg.assistant .msg-bubble').forEach(bb => attachCopy(bb, () => bb.innerText.trim()));
+
+// Minimal markdown → HTML (mirror del filtro server)
+function mdToHtml(text) {
+  if (!text) return '';
+  let s = escapeHtml(text);
+  s = s.replace(/```([\s\S]*?)```/g, (_,c) => `<pre><code>${c.trim()}</code></pre>`);
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  s = s.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(?<![*\w])\*([^*\n]+?)\*(?!\w)/g, '<em>$1</em>');
+  s = s.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+  s = s.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+  // bullet list
+  s = s.replace(/(?:^[-*] .+(?:\n|$))+/gm, m => '<ul>' + m.trim().split('\n').map(l => `<li>${l.replace(/^[-*] /,'')}</li>`).join('') + '</ul>');
+  // links
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // paragraphs
+  const blocks = s.split(/\n{2,}/);
+  return blocks.map(b => {
+    b = b.trim();
+    if (!b) return '';
+    if (/^<(h\d|ul|ol|pre|blockquote)/.test(b)) return b;
+    return '<p>' + b.replace(/\n/g, '<br>') + '</p>';
+  }).join('\n');
+}
+
+function appendUserMsg(content) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg user';
+  wrap.innerHTML = `<div class="msg-bubble">${escapeHtml(content)}</div><div class="msg-avatar bg-ink-100 text-ink-700">{{ tr('chat.you') }}</div>`;
+  msgList.appendChild(wrap);
+  scrollToBottom(true);
+}
+
+function createAssistantBubble() {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg assistant';
+  wrap.innerHTML = `<div class="msg-avatar bg-ink-900 text-white"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i></div><div class="msg-bubble"><span class="typing"><span></span><span></span><span></span></span></div>`;
+  msgList.appendChild(wrap);
+  lucide.createIcons();
+  scrollToBottom(true);
+  return wrap.querySelector('.msg-bubble');
+}
+
+async function sendMsg(e, forced, skipAppend) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (currentAbort) return;  // una risposta alla volta
+  const msg = (forced != null ? forced : input.value).trim();
+  if (!msg) return;
+  lastUserMsg = msg;
+  if (!skipAppend) appendUserMsg(msg);
+  input.value = ''; autoGrow();
+  input.disabled = true;
+  const sendBtn = document.getElementById('sendBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  if (sendBtn) sendBtn.disabled = true;
+  if (stopBtn) stopBtn.style.display = 'inline-flex';
+  currentAbort = new AbortController();
+  const bubble = createAssistantBubble();
+  let totalText = '';   // tutto quello arrivato dal server
+  let shownText = '';   // tutto quello già mostrato
+  let queue = '';       // da scrivere
+  let streamDone = false;
+  let firstChunk = true;
+  let timer = null;
+
+  function paint(streaming) {
+    if (streaming) {
+      // durante lo stream: plain text + cursore — niente markdown rendering per non far "saltare" il layout
+      bubble.classList.add('streaming');
+      bubble.innerHTML = escapeHtml(shownText) + '<span class="cursor"></span>';
+    } else {
+      // a fine stream: render markdown completo
+      bubble.classList.remove('streaming');
+      bubble.innerHTML = mdToHtml(shownText);
+      lucide.createIcons();
+    }
+    scrollToBottom();
+  }
+
+  function step() {
+    if (queue.length === 0) {
+      if (streamDone) {
+        paint(false); timer = null;
+        if (shownText.trim()) attachCopy(bubble, () => shownText.trim());
+        return;
+      }
+      timer = setTimeout(step, 40);
+      return;
+    }
+    const take = queue.length > 400 ? 12 : queue.length > 120 ? 5 : queue.length > 40 ? 2 : 1;
+    if (firstChunk) { bubble.innerHTML = ''; firstChunk = false; }
+    shownText += queue.slice(0, take);
+    queue = queue.slice(take);
+    paint(true);
+    const delay = queue.length > 400 ? 4 : queue.length > 120 ? 8 : queue.length > 40 ? 14 : 22;
+    timer = setTimeout(step, delay);
+  }
+
+  try {
+    const r = await fetch('/api/chat/' + PROSPECT_ID + '/stream', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+      signal: currentAbort.signal,
+    });
+    if (!r.ok || !r.body) throw new Error('{{ tr('chat.engine_error') }}');
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const block = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        if (!block.startsWith('data: ')) continue;
+        let evt;
+        try { evt = JSON.parse(block.slice(6)); } catch { continue; }
+        if (evt.type === 'chunk') {
+          totalText += evt.text;
+          queue += evt.text;
+          if (!timer) step();
+        } else if (evt.type === 'done') {
+          const full = evt.text || totalText;
+          if (full.length > totalText.length) {
+            queue += full.slice(totalText.length);
+            totalText = full;
+          }
+          streamDone = true;
+        } else if (evt.type === 'error') {
+          bubble.innerHTML = '<em style="color:#9f1239">⚠ ' + escapeHtml(evt.error) + '</em>';
+          streamDone = true;
+        }
+      }
+    }
+    streamDone = true;
+    if (!timer) step();
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      streamDone = true; if (!timer) step();
+      const note = document.createElement('div');
+      note.className = 'text-[11px] text-ink-400 mt-1'; note.textContent = '{{ tr('chat.response_stopped') }}';
+      bubble.appendChild(note);
+    } else {
+      bubble.innerHTML = '<em style="color:#9f1239">⚠ ' + escapeHtml(e.message) + '</em>';
+      addRetry(bubble);
+    }
+  } finally {
+    currentAbort = null;
+    input.disabled = false;
+    if (sendBtn) sendBtn.disabled = false;
+    if (stopBtn) stopBtn.style.display = 'none';
+    input.focus();
+  }
+}
+
+function stopGen() { if (currentAbort) currentAbort.abort(); }
+
+function addRetry(bubble) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'mt-2 text-[12px] font-semibold text-ink-700 hover:text-ink-900 inline-flex items-center gap-1';
+  b.innerHTML = '<i data-lucide="refresh-cw" class="w-3 h-3"></i> {{ tr('chat.retry') }}';
+  b.onclick = () => { bubble.closest('.msg')?.remove(); sendMsg(null, lastUserMsg, true); };
+  bubble.appendChild(b);
+  if (window.lucide) lucide.createIcons();
+}
+
+// I suggerimenti inviano subito (one-click)
+function askQuick(q) { input.value = ''; sendMsg(null, q); }
+
+// Conferma azione come messaggio nel thread
+function chatSystemMsg(text) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg assistant';
+  wrap.innerHTML = `<div class="msg-avatar bg-emerald-100 text-emerald-700"><i data-lucide="check" class="w-3.5 h-3.5"></i></div><div class="msg-bubble" style="background:#ecfdf5;border-color:#a7f3d0">${escapeHtml(text)}</div>`;
+  msgList.appendChild(wrap);
+  if (window.lucide) lucide.createIcons();
+  msgList.scrollTop = msgList.scrollHeight;
+}
+
+// Pannello azioni rapide (Alpine)
+function chatActions() {
+  return {
+    mode: null, err: '',
+    taskTitle: '', taskDue: '', stage: '{{ p.stage }}', noteText: '',
+    cancel() { this.mode = null; this.err = ''; },
+    reset() { this.taskTitle = ''; this.taskDue = ''; this.noteText = ''; },
+    async run(action, params) {
+      this.err = '';
+      try {
+        const r = await fetch('/api/prospects/{{ p.id }}/quick-action', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, params }),
+        });
+        const d = await r.json();
+        if (d.ok) { this.mode = null; this.reset(); chatSystemMsg('✓ ' + d.message); }
+        else { this.err = d.error || '{{ tr('chat.error') }}'; }
+      } catch (e) { this.err = '{{ tr('chat.network_error') }}'; }
+    },
+  };
+}
+
+async function clearChat() {
+  if (!confirm('{{ tr('chat.clear_confirm') }}')) return;
+  try {
+    const r = await fetch('/api/chat/' + PROSPECT_ID + '/clear', { method: 'POST' });
+    if (!r.ok) throw new Error(r.status);
+    location.reload();
+  } catch (_) {
+    window.toast('{{ tr('chat.engine_error') }}', {type: 'error'});
+  }
+}
+
+msgList.scrollTop = msgList.scrollHeight;
+</script>
+{% endblock %}

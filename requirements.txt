@@ -1,0 +1,7 @@
+flask==3.0.3
+markupsafe==2.1.5
+requests==2.32.3
+weasyprint==62.3
+# pydyf è dipendenza di weasyprint: la 0.12 ha rimosso Stream.transform e rompe
+# weasyprint 62.3. Pin esplicito alla versione compatibile.
+pydyf==0.11.0
