@@ -250,20 +250,25 @@ def inject_globals():
         "LANGS": LANGS,
         "LANG_LABELS": LANG_LABELS,
         "app_version": cfg.__version__,
-        "claude_ok": _claude_available(),
+        "ai_ok": _ai_available(),
+        "ai_engine": ai_engine.engine(),
     }
 
 
-_CLAUDE_CHECK = {"ok": None, "at": 0.0}
+_AI_CHECK = {"ok": None, "at": 0.0, "engine": None}
 
-def _claude_available() -> bool:
-    """True se il CLI `claude` è nel PATH. Cache 60s: shutil.which a ogni request è inutile."""
+def _ai_available() -> bool:
+    """True se il CLI del motore AI attivo (claude o codex) è nel PATH.
+    Cache 60s (invalidata al cambio motore): shutil.which a ogni request è inutile."""
     import time as _time, shutil as _shutil
     now = _time.monotonic()
-    if _CLAUDE_CHECK["ok"] is None or now - _CLAUDE_CHECK["at"] > 60:
-        _CLAUDE_CHECK["ok"] = bool(_shutil.which(cfg.CLAUDE_BIN or "claude"))
-        _CLAUDE_CHECK["at"] = now
-    return _CLAUDE_CHECK["ok"]
+    eng = ai_engine.engine()
+    if _AI_CHECK["ok"] is None or _AI_CHECK["engine"] != eng or now - _AI_CHECK["at"] > 60:
+        binary = (cfg.CODEX_BIN or "codex") if eng == "codex" else (cfg.CLAUDE_BIN or "claude")
+        _AI_CHECK["ok"] = bool(_shutil.which(binary))
+        _AI_CHECK["at"] = now
+        _AI_CHECK["engine"] = eng
+    return _AI_CHECK["ok"]
 
 
 @app.template_filter("money")
@@ -321,7 +326,9 @@ def md_filter(text):
     s = _re.sub(r"(?m)(?:^[-*]\s+.+(?:\n|$))+", _ul, s)
     # numbered lists
     def _ol(m):
-        items = "".join(f"<li>{_re.sub(r'^[0-9]+\\.\\s+', '', line).strip()}</li>"
+        # niente backslash dentro le graffe f-string: su Python < 3.12 è SyntaxError (PEP 701)
+        _strip_num = _re.compile(r"^[0-9]+\.\s+")
+        items = "".join(f"<li>{_strip_num.sub('', line).strip()}</li>"
                         for line in m.group(0).strip().splitlines() if _re.match(r"^[0-9]+\.\s+", line))
         return f"<ol>{items}</ol>"
     s = _re.sub(r"(?m)(?:^[0-9]+\.\s+.+(?:\n|$))+", _ol, s)
@@ -1945,7 +1952,8 @@ def settings():
     import shutil
     import config as cfg
     info = {
-        "claude_bin": shutil.which("claude"),
+        "claude_bin": shutil.which(cfg.CLAUDE_BIN or "claude"),
+        "codex_bin": shutil.which(cfg.CODEX_BIN or "codex"),
         "db_path": "data/crm.db",
     }
     try:
@@ -1963,6 +1971,8 @@ def settings():
         hunter_seniority=cfg.HUNTER_SENIORITY,
         hunter_key_set=bool(cfg.HUNTER_API_KEY),
         claude_bin_cfg=cfg.CLAUDE_BIN,
+        codex_bin_cfg=cfg.CODEX_BIN,
+        ai_engine_cfg=cfg.AI_ENGINE,
         env_path=_config_env_path(),
         backups=list_backups(),
     )
@@ -2024,6 +2034,11 @@ def settings_save():
         updates["HUNTER_CACHE_DAYS"] = cache_days
     if "claude_bin" in request.form:  # solo se il form include il campo
         updates["CLAUDE_BIN"] = request.form.get("claude_bin", "").strip()
+    if "codex_bin" in request.form:
+        updates["CODEX_BIN"] = request.form.get("codex_bin", "").strip()
+    eng = request.form.get("ai_engine", "").strip().lower()
+    if eng in ("claude", "codex"):
+        updates["FORAGER_AI_ENGINE"] = eng
 
     if not updates:
         flash("Nessuna modifica.", "info")
@@ -2043,7 +2058,12 @@ def settings_save():
         pass
     cfg.CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "").strip()
     ai_engine.CLAUDE_BIN = cfg.CLAUDE_BIN or _sh.which("claude") or "claude"
-    _CLAUDE_CHECK["ok"] = None  # forza un nuovo check del CLI
+    cfg.CODEX_BIN = os.environ.get("CODEX_BIN", "").strip()
+    ai_engine.CODEX_BIN = cfg.CODEX_BIN or _sh.which("codex") or "codex"
+    new_eng = os.environ.get("FORAGER_AI_ENGINE", "").strip().lower()
+    if new_eng in ("claude", "codex"):
+        cfg.AI_ENGINE = new_eng
+    _AI_CHECK["ok"] = None  # forza un nuovo check del CLI
 
     flash("Chiave Hunter rimossa." if request.form.get("hunter_remove")
           else "Impostazioni salvate.", "success")

@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.1.0 — 2026-07-14
+
+### Added
+- **Motore AI alternativo: OpenAI Codex CLI** (`codex exec`), selezionabile da Settings → Motore AI
+  o con `FORAGER_AI_ENGINE=codex`. Stesse funzioni (ricerca, compose, chat, streaming); il cambio
+  è immediato, senza riavvio. Claude Code resta il default consigliato.
+- Variabili `CODEX_BIN` e `CODEX_MODEL` in `.env`; percorso Codex configurabile anche da Settings
+- `forager doctor` e `forager init` riconoscono entrambi i motori e indicano quello attivo
+- Banner "motore mancante" e messaggi d'errore specifici per motore
+- Guida in-app: nuovo blocco "Scegliere il motore AI"; documentazione in `docs/` rigenerata
+
+### Fixed
+- Compile check CI su Python 3.10/3.11: rimossa f-string con backslash (PEP 701, solo 3.12+)
+
 ## v1.0.0 — 2026-06-09
 
 Prima release pubblica.

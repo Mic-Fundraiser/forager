@@ -30,7 +30,11 @@ Forager è un CRM per fundraiser che gira interamente sul tuo computer: i dati r
 
 ### Cosa serve per usare Forager
 
-Forager funziona out-of-the-box per anagrafica, pipeline, donazioni e task. Le funzioni **AI** (ricerca, email, chat) richiedono **Claude Code CLI** installato e autenticato sul computer: se manca vedi un banner giallo in alto. **Hunter.io** è opzionale e serve solo per trovare indirizzi email.
+Forager funziona out-of-the-box per anagrafica, pipeline, donazioni e task. Le funzioni **AI** (ricerca, email, chat) richiedono un CLI agentico installato e autenticato sul computer: **Claude Code** (Anthropic, consigliato) oppure **Codex CLI** (OpenAI). Se il motore scelto manca vedi un banner giallo in alto. **Hunter.io** è opzionale e serve solo per trovare indirizzi email.
+
+### Scegliere il motore AI: Claude Code o Codex
+
+Da **Settings → Motore AI** scegli quale CLI usare: **Claude Code** (`npm install -g @anthropic-ai/claude-code`, poi `claude` per il login) o **Codex CLI** (`npm install -g @openai/codex`, poi `codex login`). Ogni motore usa il rispettivo abbonamento (Claude o ChatGPT): nessuna API key da incollare in Forager. Il cambio è immediato, senza riavvio. Claude Code resta il motore consigliato: è quello con cui Forager è sviluppato e testato.
 
 ### Avviare e gestire l'app
 
@@ -306,7 +310,7 @@ Ogni chiamata AI è tracciata: sai sempre quanto stai spendendo e per cosa.
 
 ### La pagina Usage
 
-**Usage** mostra numero di chiamate, token, costo stimato e durata — totali, ultimi 7/30 giorni, per **tipo di operazione** (ricerca, compose, chat…) e per **prospect**. Vedi anche gli errori e la quota Hunter residua.
+**Usage** mostra numero di chiamate, token, costo stimato e durata — totali, ultimi 7/30 giorni, per **tipo di operazione** (ricerca, compose, chat…) e per **prospect**. Vedi anche gli errori e la quota Hunter residua. Nota: con il motore **Codex** il CLI non riporta il costo in dollari — vedi comunque token e durata.
 
 ### Tenere bassi i costi
 

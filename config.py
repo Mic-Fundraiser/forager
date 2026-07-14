@@ -29,7 +29,7 @@ def _load_dotenv():
 
 _load_dotenv()
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 # ---------- Flask ----------
@@ -74,9 +74,20 @@ HUNTER_SENIORITY = os.getenv("HUNTER_SENIORITY", "executive")
 HUNTER_MAX_PER_DOMAIN = int(os.getenv("HUNTER_MAX_PER_DOMAIN", "25"))
 
 
-# ---------- Claude CLI ----------
+# ---------- Motore AI ----------
+# Quale CLI usare come motore: "claude" (Claude Code, default) o "codex" (OpenAI Codex CLI).
+# Entrambi girano in locale con il rispettivo abbonamento — nessuna API key in Forager.
+AI_ENGINE = (os.getenv("FORAGER_AI_ENGINE", "claude").strip().lower() or "claude")
+if AI_ENGINE not in ("claude", "codex"):
+    AI_ENGINE = "claude"
+
 # Path al binary `claude`. Auto-detect se vuoto.
 CLAUDE_BIN = os.getenv("CLAUDE_BIN", "").strip()
+
+# Path al binary `codex`. Auto-detect se vuoto.
+CODEX_BIN = os.getenv("CODEX_BIN", "").strip()
+# Modello per Codex (vuoto = default del CLI). Es: gpt-5-codex
+CODEX_MODEL = os.getenv("CODEX_MODEL", "").strip()
 
 
 # ---------- Diagnostica ----------
@@ -86,7 +97,9 @@ def status() -> dict:
         "version": __version__,
         "secret_set": bool(SECRET_KEY),
         "hunter_set": bool(HUNTER_API_KEY),
+        "ai_engine": AI_ENGINE,
         "claude_bin": shutil.which(CLAUDE_BIN or "claude"),
+        "codex_bin": shutil.which(CODEX_BIN or "codex"),
         "host": HOST,
         "port": PORT,
     }

@@ -48,6 +48,18 @@ def has_claude() -> str | None:
     return shutil.which("claude")
 
 
+def _env_value(key: str) -> str:
+    """Valore da env o .env (senza dipendenze)."""
+    val = os.getenv(key, "")
+    env_file = ROOT / ".env"
+    if not val and env_file.exists():
+        for l in env_file.read_text(encoding="utf-8").splitlines():
+            if l.strip().startswith(key + "="):
+                val = l.split("=", 1)[1]
+    val = val.split("#", 1)[0].strip().strip("'\"")
+    return val
+
+
 def cmd_init():
     print(BOLD("\n  Forager · setup iniziale\n"))
 
@@ -86,15 +98,20 @@ def cmd_init():
     else:
         print(OK(".env già presente"))
 
-    # 6. claude CLI check
+    # 6. motore AI check (claude o codex)
     claude_path = has_claude()
+    codex_path = shutil.which("codex")
     if claude_path:
         print(OK(f"Claude CLI trovato: {claude_path}"))
+    elif codex_path:
+        print(OK(f"Codex CLI trovato: {codex_path}"))
+        print(INFO("  Per usarlo come motore: FORAGER_AI_ENGINE=codex in .env (o da Settings)."))
     else:
-        print(WARN("Claude CLI non trovato nel PATH."))
-        print("    Forager USA Claude Code per la ricerca AI. Installalo da:")
+        print(WARN("Nessun motore AI trovato nel PATH (né claude né codex)."))
+        print("    Forager usa Claude Code (consigliato) o Codex CLI per la ricerca AI. Installa uno dei due:")
         print("    https://docs.claude.com/claude-code")
-        print("    Il tool funziona anche senza, ma la ricerca OSINT non sarà disponibile.")
+        print("    https://developers.openai.com/codex/cli")
+        print("    Il tool funziona anche senza, ma le funzioni AI non saranno disponibili.")
 
     print(BOLD("\n  Setup completato. Lancia ora:\n"))
     print(f"    {C('./forager start', '36')}\n")
@@ -152,8 +169,13 @@ def cmd_doctor():
     print(("OK " if venv_exists() else "KO ") + f"venv ({VENV})")
     print(("OK " if DB_PATH.exists() else "KO ") + f"Database ({DB_PATH})")
 
+    engine = "codex" if _env_value("FORAGER_AI_ENGINE").lower() == "codex" else "claude"
     claude = has_claude()
-    print(("OK " if claude else "KO ") + f"Claude CLI {claude or '(non trovato — installa: https://docs.claude.com/claude-code)'}")
+    codex = shutil.which("codex")
+    mark_claude = "OK " if claude else ("KO " if engine == "claude" else "—  ")
+    mark_codex = "OK " if codex else ("KO " if engine == "codex" else "—  ")
+    print(mark_claude + f"Claude CLI {claude or '(non trovato — installa: https://docs.claude.com/claude-code)'}" + (" ← motore attivo" if engine == "claude" else ""))
+    print(mark_codex + f"Codex CLI {codex or '(non trovato — opzionale: npm i -g @openai/codex)'}" + (" ← motore attivo" if engine == "codex" else ""))
 
     env_file = ROOT / ".env"
     print(("OK " if env_file.exists() else "KO ") + f".env ({env_file})")
@@ -173,6 +195,12 @@ def cmd_doctor():
             print("OK " + f"Claude version: {out}")
         except Exception as e:
             print("KO " + f"Claude error: {e}")
+    if codex:
+        try:
+            out = subprocess.check_output([codex, "--version"], text=True, timeout=5).strip()
+            print("OK " + f"Codex version: {out}")
+        except Exception as e:
+            print("KO " + f"Codex error: {e}")
     print()
 
 

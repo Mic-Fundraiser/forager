@@ -68,7 +68,9 @@ Inserisci un nome → Claude esegue ricerca web pubblica, sintetizza un profilo 
 ### Requisiti
 
 - Python 3.10+
-- [Claude Code CLI](https://docs.claude.com/claude-code) installato e autenticato (il "motore AI")
+- Un motore AI a scelta, installato e autenticato:
+  - [Claude Code CLI](https://docs.claude.com/claude-code) di Anthropic (consigliato), **oppure**
+  - [Codex CLI](https://developers.openai.com/codex/cli) di OpenAI (si seleziona da Settings o con `FORAGER_AI_ENGINE=codex`)
 - macOS / Linux / Windows
 - (opzionale) Account Hunter.io free per ricerca email decision maker
 
@@ -104,7 +106,7 @@ forager.bat start
 docker compose up -d
 ```
 
-> **Nota**: dentro Docker l'AI engine Claude non è disponibile (richiede il binary host autenticato).
+> **Nota**: dentro Docker i motori AI (claude/codex) non sono disponibili (richiedono il binary host autenticato).
 > Per usare la ricerca AI, esegui Forager nativamente con `./forager start`.
 > La porta è pubblicata solo su `127.0.0.1` perché l'app non ha autenticazione: per accesso
 > remoto usa un reverse proxy con auth o una VPN.
@@ -113,11 +115,13 @@ docker compose up -d
 
 ## Costi
 
-Forager è gratuito (MIT). Il motore AI è il CLI di **Claude Code, che è un servizio a pagamento
-di Anthropic**: Forager lo invoca in locale usando il TUO abbonamento — nessuna chiave passa da noi,
-nessun costo aggiuntivo oltre a quello che già paghi ad Anthropic. Ogni azione AI è esplicita
-(niente chiamate automatiche in background) e la pagina **Consumo AI** ti mostra quanto usi.
-Hunter.io è opzionale e ha un piano gratuito (25 ricerche/mese).
+Forager è gratuito (MIT). Il motore AI è un CLI a pagamento che invochi in locale con il TUO
+abbonamento: **Claude Code** (Anthropic, consigliato) oppure **Codex CLI** (OpenAI, incluso
+nell'abbonamento ChatGPT Plus/Pro) — nessuna chiave passa da noi, nessun costo aggiuntivo oltre
+a quello che già paghi al provider. Ogni azione AI è esplicita (niente chiamate automatiche in
+background) e la pagina **Consumo AI** ti mostra quanto usi (con Codex il CLI non riporta il
+costo in dollari: vedi comunque token e durata). Hunter.io è opzionale e ha un piano gratuito
+(25 ricerche/mese).
 
 ---
 
@@ -150,9 +154,12 @@ Variabili principali:
 | `FORAGER_PORT` | `5000` | Porta del web server |
 | `FORAGER_HOST` | `127.0.0.1` | `0.0.0.0` per rete locale (sconsigliato: nessuna auth) |
 | `FORAGER_SECRET_KEY` | auto | Generata e salvata in `data/.secret_key` al primo avvio |
+| `FORAGER_AI_ENGINE` | `claude` | Motore AI: `claude` (Claude Code) o `codex` (OpenAI Codex CLI) |
 | `HUNTER_API_KEY` | vuota | Tua chiave [hunter.io](https://hunter.io) (free tier OK) |
 | `HUNTER_SENIORITY` | `executive` | Filtro decision maker (`executive`/`senior`/`junior`) |
 | `CLAUDE_BIN` | auto | Path al binary `claude` se non nel PATH |
+| `CODEX_BIN` | auto | Path al binary `codex` se non nel PATH |
+| `CODEX_MODEL` | default CLI | Modello per Codex (es. `gpt-5-codex`) |
 
 ---
 
@@ -168,12 +175,20 @@ Variabili principali:
 
 ## Troubleshooting
 
-**"Il CLI claude non risulta installato"** (banner giallo in dashboard)
+**"Il motore AI non è disponibile"** (banner giallo in dashboard)
+
+Con motore **Claude Code** (default):
 ```bash
 npm install -g @anthropic-ai/claude-code
 claude   # primo avvio: login con il tuo account Anthropic
 ```
-Poi riavvia Forager. Se `claude` è installato ma non nel PATH, imposta `CLAUDE_BIN=/percorso/claude` in `.env`.
+Con motore **Codex** (se selezionato in Settings):
+```bash
+npm install -g @openai/codex
+codex login   # login con il tuo account ChatGPT
+```
+Poi riavvia Forager. Se il binary è installato ma non nel PATH, imposta `CLAUDE_BIN=/percorso/claude`
+(o `CODEX_BIN=/percorso/codex`) in `.env` o da Settings.
 
 **Export PDF non funziona su macOS** — WeasyPrint richiede librerie di sistema:
 ```bash
@@ -215,7 +230,7 @@ In alternativa usa "Stampa → Salva come PDF" dal browser (pulsante Stampa nell
 ## Stack
 
 - **Backend**: Python 3, Flask, SQLite (zero dipendenze esterne pesanti)
-- **AI engine**: Claude Code CLI in subprocess (usa il tuo abbonamento, niente API key Anthropic)
+- **AI engine**: Claude Code CLI o OpenAI Codex CLI in subprocess (usa il tuo abbonamento, niente API key)
 - **Frontend**: Tailwind CSS, Lucide icons, HTMX, Alpine.js — tutto servito in locale, zero build step
 - **Search email**: Hunter.io API (opzionale)
 - **Sicurezza**: CSRF su tutte le POST, secret key auto-generata, bind solo su localhost, Docker non-root

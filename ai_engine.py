@@ -1,5 +1,6 @@
-"""Wrapper around the local `claude` CLI to run ricerca AI research via the user's
-Claude Code subscription. No external API keys required."""
+"""Wrapper around a local agent CLI (`claude` di Claude Code, default, oppure
+`codex` di OpenAI) usato come motore AI via l'abbonamento dell'utente.
+No external API keys required."""
 import json
 import re
 import shutil
@@ -14,6 +15,33 @@ from datetime import date
 from db import cursor, get_org, rows_to_dicts, dict_from_row
 
 CLAUDE_BIN = config.CLAUDE_BIN or shutil.which("claude") or "claude"
+CODEX_BIN = config.CODEX_BIN or shutil.which("codex") or "codex"
+
+
+def engine() -> str:
+    """Motore attivo: 'claude' o 'codex'. Letto a ogni chiamata: cambia da Settings senza riavvio."""
+    return "codex" if getattr(config, "AI_ENGINE", "claude") == "codex" else "claude"
+
+
+def engine_label(eng: str | None = None) -> str:
+    return "Codex (OpenAI)" if (eng or engine()) == "codex" else "Claude Code"
+
+
+def _codex_cmd(prompt: str, allowed_tools: list[str] | None) -> list[str]:
+    """Comando `codex exec` equivalente a una chiamata claude -p.
+
+    - --json: eventi JSONL su stdout (agent_message, turn.completed con usage)
+    - --sandbox read-only + --skip-git-repo-check: nessuna modifica a file, eseguibile ovunque
+    - web search abilitata solo se la chiamata la richiede (allowed_tools None o con WebSearch/WebFetch)
+    """
+    cmd = [CODEX_BIN, "exec", "--json", "--skip-git-repo-check", "--sandbox", "read-only"]
+    if config.CODEX_MODEL:
+        cmd += ["-m", config.CODEX_MODEL]
+    wants_web = allowed_tools is None or any(t in ("WebSearch", "WebFetch") for t in allowed_tools)
+    if wants_web:
+        cmd += ["--search"]
+    cmd += [prompt]
+    return cmd
 
 
 def build_context() -> str:
@@ -163,27 +191,36 @@ def _extract_json(text: str) -> Optional[dict]:
 def run_claude_stream(prompt: str, allowed_tools: list[str] | None = None,
                       usage_kind: str | None = None, prospect_id: int | None = None,
                       timeout: int = DEFAULT_TIMEOUT):
-    """Generator che yielda eventi dal CLI claude in modalità stream-json.
+    """Generator che yielda eventi dal motore AI attivo (claude stream-json o codex exec --json).
 
     Eventi yieldati (dict):
       {"type": "chunk", "text": "<delta>"}
       {"type": "done",  "text": "<full>", "usage": {...}}
       {"type": "error", "error": "..."}
     """
-    cmd = [
-        CLAUDE_BIN,
-        "-p", prompt,
-        "--output-format", "stream-json",
-        "--verbose",
-    ]
-    if allowed_tools is not None:
-        cmd += ["--allowed-tools", ",".join(allowed_tools) if allowed_tools else ""]
+    eng = engine()
+    if eng == "codex":
+        cmd = _codex_cmd(prompt, allowed_tools)
+    else:
+        cmd = [
+            CLAUDE_BIN,
+            "-p", prompt,
+            "--output-format", "stream-json",
+            "--verbose",
+        ]
+        if allowed_tools is not None:
+            cmd += ["--allowed-tools", ",".join(allowed_tools) if allowed_tools else ""]
 
     t0 = time.time()
     accumulated = ""
     in_tok = out_tok = None
     cost_usd = None
     done_emitted = False
+    error_emitted = False
+    tech_err = None
+    codex_item_id = None   # id dell'agent_message corrente (codex)
+    codex_base = 0         # offset in accumulated dove inizia l'item corrente
+    _notes = "codex" if eng == "codex" else None
     try:
         proc = subprocess.Popen(
             cmd,
@@ -194,8 +231,8 @@ def run_claude_stream(prompt: str, allowed_tools: list[str] | None = None,
         )
     except FileNotFoundError:
         if usage_kind:
-            _log_usage(usage_kind, prospect_id, 0, None, None, None, False, "claude CLI non trovato")
-        yield {"type": "error", "error": "Motore AI non disponibile: Claude Code non risulta installato o autenticato."}
+            _log_usage(usage_kind, prospect_id, 0, None, None, None, False, f"{eng} CLI non trovato", notes=_notes)
+        yield {"type": "error", "error": _friendly_error("non trovato", eng)}
         return
 
     # Watchdog: se il processo non produce un risultato entro `timeout`, lo termina.
@@ -279,11 +316,42 @@ def run_claude_stream(prompt: str, allowed_tools: list[str] | None = None,
                 yield {"type": "done", "text": accumulated,
                        "usage": {"input_tokens": in_tok, "output_tokens": out_tok, "cost_usd": cost_usd}}
                 break
+            # ---- eventi codex exec --json ----
+            elif etype in ("item.updated", "item.completed") and (evt.get("item") or {}).get("type") == "agent_message":
+                item = evt.get("item") or {}
+                itext = item.get("text") or ""
+                iid = item.get("id")
+                if iid != codex_item_id:
+                    # nuovo messaggio: separa dal precedente (raro: di norma un solo agent_message)
+                    codex_item_id = iid
+                    if accumulated:
+                        accumulated += "\n\n"
+                        yield {"type": "chunk", "text": "\n\n"}
+                    codex_base = len(accumulated)
+                cand = accumulated[:codex_base] + itext
+                if len(cand) > len(accumulated):
+                    delta = cand[len(accumulated):]
+                    accumulated = cand
+                    yield {"type": "chunk", "text": delta}
+            elif etype == "turn.completed":
+                usage = evt.get("usage") or {}
+                in_tok = usage.get("input_tokens")
+                out_tok = usage.get("output_tokens")
+                done_emitted = True
+                yield {"type": "done", "text": accumulated,
+                       "usage": {"input_tokens": in_tok, "output_tokens": out_tok, "cost_usd": None}}
+                break
+            elif etype in ("turn.failed",) or (eng == "codex" and etype == "error"):
+                e = evt.get("error")
+                tech_err = (e.get("message") if isinstance(e, dict) else e) or evt.get("message") or etype
+                error_emitted = True
+                yield {"type": "error", "error": _friendly_error(tech_err, eng)}
+                break
         # timeout scattato: avvisa il client invece di chiudere in silenzio
-        if timed_out["v"] and not done_emitted:
-            yield {"type": "error", "error": _friendly_error("timeout")}
-        # loop terminato senza evento `result` (es. CLI chiusa a metà): done di fallback
-        elif not done_emitted:
+        if timed_out["v"] and not done_emitted and not error_emitted:
+            yield {"type": "error", "error": _friendly_error("timeout", eng)}
+        # loop terminato senza evento finale (es. CLI chiusa a metà): done di fallback
+        elif not done_emitted and not error_emitted:
             done_emitted = True
             yield {"type": "done", "text": accumulated,
                    "usage": {"input_tokens": in_tok, "output_tokens": out_tok, "cost_usd": cost_usd}}
@@ -305,7 +373,8 @@ def run_claude_stream(prompt: str, allowed_tools: list[str] | None = None,
         duration_ms = int((time.time() - t0) * 1000)
         if usage_kind:
             _log_usage(usage_kind, prospect_id, duration_ms, in_tok, out_tok, cost_usd, done_emitted,
-                       error=None if done_emitted else ("timeout" if timed_out["v"] else "stream interrotto"))
+                       error=None if done_emitted else (tech_err or ("timeout" if timed_out["v"] else "stream interrotto")),
+                       notes=_notes)
 
 
 def _log_usage(kind: str, prospect_id: int | None, duration_ms: int,
@@ -323,24 +392,28 @@ def _log_usage(kind: str, prospect_id: int | None, duration_ms: int,
         pass
 
 
-def _friendly_error(raw: str | None) -> str:
+def _friendly_error(raw: str | None, eng: str | None = None) -> str:
     """Traduce gli errori tecnici della CLI in messaggi azionabili per un fundraiser non-tech.
     Il messaggio tecnico originale resta comunque salvato in usage_log."""
+    eng = eng or engine()
+    name = engine_label(eng)
+    cli = "codex" if eng == "codex" else "claude"
     e = (raw or "").lower()
     if not e:
         return "Errore sconosciuto. Riprova; se persiste riavvia Forager."
     if "non trovat" in e or "not found" in e or "no such file" in e:
-        return "Motore AI non disponibile: Claude Code non risulta installato o autenticato. Apri il terminale e verifica con « claude ». "
+        return f"Motore AI non disponibile: {name} non risulta installato o autenticato. Apri il terminale e verifica con « {cli} »."
     if "timeout" in e:
         return "La ricerca ha impiegato troppo tempo e si è interrotta. Riprova: spesso al secondo tentativo va a buon fine."
     if "json" in e:
-        return "Claude ha risposto in un formato non leggibile. Riprova la ricerca."
+        return "Il motore AI ha risposto in un formato non leggibile. Riprova la ricerca."
     if "overloaded" in e or "rate" in e or "429" in e or "limit" in e:
         return "Il servizio AI è momentaneamente sovraccarico o hai raggiunto un limite d'uso. Attendi qualche minuto e riprova."
     if "auth" in e or "401" in e or "403" in e or "login" in e:
-        return "Sessione Claude scaduta. Riautenticati con « claude » nel terminale, poi riprova."
+        return f"Sessione {name} scaduta. Riautenticati con « {cli} login » nel terminale, poi riprova." if eng == "codex" \
+            else f"Sessione {name} scaduta. Riautenticati con « {cli} » nel terminale, poi riprova."
     # default: messaggio generico + traccia breve
-    return "Si è verificato un errore con il motore AI. Riprova; se persiste, controlla che Claude Code sia attivo."
+    return f"Si è verificato un errore con il motore AI. Riprova; se persiste, controlla che {name} sia attivo."
 
 
 def _repair_json(raw_text: str, timeout: int = 90) -> Optional[dict]:
@@ -353,6 +426,13 @@ def _repair_json(raw_text: str, timeout: int = 90) -> Optional[dict]:
         "Correggi virgole finali, virgolette e parentesi non chiuse. "
         "Restituisci SOLO il JSON, niente altro, niente markdown.\n\n---\n" + raw_text[:20000]
     )
+    if engine() == "codex":
+        try:
+            proc = subprocess.run(_codex_cmd(prompt, []), capture_output=True, text=True, timeout=timeout)
+        except Exception:
+            return None
+        text, _, _, _ = _parse_codex_jsonl(proc.stdout or "")
+        return _extract_json(text)
     try:
         proc = subprocess.run(
             [CLAUDE_BIN, "-p", prompt, "--output-format", "json", "--allowed-tools", ""],
@@ -369,6 +449,73 @@ def _repair_json(raw_text: str, timeout: int = 90) -> Optional[dict]:
     return _extract_json(out)
 
 
+def _parse_codex_jsonl(raw: str):
+    """Estrae (testo, input_tokens, output_tokens, errore) dagli eventi JSONL di `codex exec --json`.
+
+    Eventi rilevanti: item.completed con item.type == "agent_message" (testo del modello),
+    turn.completed (usage), turn.failed / error (messaggio d'errore). Righe non-JSON ignorate.
+    """
+    text_parts: list[str] = []
+    in_tok = out_tok = None
+    err = None
+    for line in (raw or "").splitlines():
+        line = line.strip()
+        if not line or not line.startswith("{"):
+            continue
+        try:
+            evt = json.loads(line)
+        except Exception:
+            continue
+        etype = evt.get("type") or ""
+        if etype == "item.completed":
+            item = evt.get("item") or {}
+            if item.get("type") == "agent_message" and item.get("text"):
+                text_parts.append(item["text"])
+        elif etype == "turn.completed":
+            usage = evt.get("usage") or {}
+            in_tok = usage.get("input_tokens")
+            out_tok = usage.get("output_tokens")
+        elif etype in ("turn.failed", "error"):
+            e = evt.get("error")
+            err = (e.get("message") if isinstance(e, dict) else e) or evt.get("message") or etype
+    return "\n\n".join(text_parts), in_tok, out_tok, err
+
+
+def _run_codex(prompt: str, timeout: int, usage_kind: str | None, prospect_id: int | None,
+               allowed_tools: list[str] | None, repair_json: bool) -> dict:
+    """Equivalente di run_claude sul CLI `codex` (OpenAI). Stessa forma di ritorno."""
+    t0 = time.time()
+    try:
+        proc = subprocess.run(_codex_cmd(prompt, allowed_tools), capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if usage_kind:
+            _log_usage(usage_kind, prospect_id, int((time.time()-t0)*1000), None, None, None, False, "timeout", notes="codex")
+        return {"ok": False, "error": _friendly_error("timeout", "codex"), "error_tech": "timeout", "raw": ""}
+    except FileNotFoundError:
+        if usage_kind:
+            _log_usage(usage_kind, prospect_id, int((time.time()-t0)*1000), None, None, None, False, "codex CLI non trovato", notes="codex")
+        return {"ok": False, "error": _friendly_error("non trovato", "codex"), "error_tech": "codex CLI non trovato", "raw": ""}
+
+    duration_ms = int((time.time() - t0) * 1000)
+    raw = proc.stdout or ""
+    text, in_tok, out_tok, evt_err = _parse_codex_jsonl(raw)
+
+    if not text and (evt_err or proc.returncode != 0):
+        tech = evt_err or (proc.stderr or "").strip() or f"exit {proc.returncode}"
+        if usage_kind:
+            _log_usage(usage_kind, prospect_id, duration_ms, in_tok, out_tok, None, False, tech, notes="codex")
+        return {"ok": False, "error": _friendly_error(tech, "codex"), "error_tech": tech, "raw": raw}
+
+    parsed = _extract_json(text)
+    if parsed is None and repair_json and text.strip():
+        parsed = _repair_json(text)
+    if usage_kind:
+        _log_usage(usage_kind, prospect_id, duration_ms, in_tok, out_tok, None, True, notes="codex")
+    return {"ok": True, "text": text, "json": parsed, "raw": raw, "error": None,
+            "input_tokens": in_tok, "output_tokens": out_tok, "cost_usd": None,
+            "duration_ms": duration_ms}
+
+
 def run_claude(prompt: str, timeout: int = DEFAULT_TIMEOUT,
                usage_kind: str | None = None, prospect_id: int | None = None,
                allowed_tools: list[str] | None = None, repair_json: bool = False) -> dict:
@@ -383,6 +530,8 @@ def run_claude(prompt: str, timeout: int = DEFAULT_TIMEOUT,
     Returns a dict with keys: ok, text, json (parsed), raw, error.
     Se usage_kind è valorizzato, logga una riga in usage_log.
     """
+    if engine() == "codex":
+        return _run_codex(prompt, timeout, usage_kind, prospect_id, allowed_tools, repair_json)
     if allowed_tools is None:
         allowed_tools = ["WebSearch", "WebFetch"]
     cmd = [

@@ -203,13 +203,22 @@ CAT = {
     # --- settings ---
     "settings.breadcrumb": {"it": "Workspace · Sistema", "en": "Workspace · System"},
     "settings.title": {"it": "Settings", "en": "Settings"},
-    "settings.claude_title": {"it": "AI engine · Claude Code", "en": "AI engine · Claude Code"},
+    "settings.engine_title": {"it": "Motore AI", "en": "AI engine"},
     "settings.connected": {"it": "Connesso", "en": "Connected"},
     "settings.not_found": {"it": "Non trovato", "en": "Not found"},
-    "settings.claude_info": {
-        "it": "Il tool usa il CLI <code>claude</code> come motore AI tramite il tuo abbonamento Claude Code. Nessuna API key esterna richiesta.",
-        "en": "The tool uses the <code>claude</code> CLI as AI engine through your Claude Code subscription. No external API key required.",
+    "settings.engine_installed": {"it": "installato", "en": "installed"},
+    "settings.engine_info": {
+        "it": "Forager usa come motore AI un CLI agentico installato sul tuo computer, con il tuo abbonamento: <b>Claude Code</b> (Anthropic, consigliato) oppure <b>Codex CLI</b> (OpenAI). Nessuna API key da inserire: l'autenticazione la fa il CLI stesso.",
+        "en": "Forager's AI engine is an agent CLI installed on your computer, using your own subscription: <b>Claude Code</b> (Anthropic, recommended) or <b>Codex CLI</b> (OpenAI). No API key to paste: the CLI handles authentication.",
     },
+    "settings.engine_claude_sub": {"it": "Abbonamento Claude · consigliato", "en": "Claude subscription · recommended"},
+    "settings.engine_codex_sub": {"it": "Abbonamento ChatGPT (Plus/Pro)", "en": "ChatGPT subscription (Plus/Pro)"},
+    "settings.codex_install_hint": {
+        "it": "Il CLI codex non è installato (o non è nel PATH). Installalo e riavvia Forager:",
+        "en": "The codex CLI is not installed (or not in PATH). Install it and restart Forager:",
+    },
+    "settings.codex_install_link": {"it": "Guida all'installazione di Codex CLI", "en": "Codex CLI install guide"},
+    "settings.codex_binary": {"it": "Codex binary", "en": "Codex binary"},
     "settings.claude_install_hint": {
         "it": "Il CLI claude non è installato (o non è nel PATH). Installalo e riavvia Forager:",
         "en": "The claude CLI is not installed (or not in PATH). Install it and restart Forager:",
@@ -282,6 +291,7 @@ CAT = {
     "settings.env_title": {"it": "Override via env", "en": "Env overrides"},
     "settings.diag_title": {"it": "Diagnostica", "en": "Diagnostics"},
     "settings.diag_claude": {"it": "Test CLI Claude", "en": "Test Claude CLI"},
+    "settings.diag_codex": {"it": "Test CLI Codex", "en": "Test Codex CLI"},
     "settings.diag_hunter": {"it": "Test Hunter", "en": "Test Hunter"},
 
     # --- cadenze di ricontatto ---
@@ -379,10 +389,14 @@ CAT = {
     "netg.propensity": {"it": "Propensione", "en": "Propensity"},
     "netg.ask_lbl": {"it": "Ask", "en": "Ask"},
 
-    # --- banner Claude CLI mancante ---
+    # --- banner motore AI mancante ---
     "claude.missing_banner": {
         "it": "Il motore AI non è disponibile: il CLI “claude” (Claude Code) non risulta installato. Le funzioni di ricerca e scrittura AI non funzioneranno.",
         "en": "The AI engine is unavailable: the “claude” CLI (Claude Code) is not installed. AI research and writing features won't work.",
+    },
+    "codex.missing_banner": {
+        "it": "Il motore AI non è disponibile: il CLI “codex” (OpenAI) non risulta installato. Le funzioni di ricerca e scrittura AI non funzioneranno. Puoi cambiare motore in Settings.",
+        "en": "The AI engine is unavailable: the “codex” CLI (OpenAI) is not installed. AI research and writing features won't work. You can switch engine in Settings.",
     },
     "claude.missing_link": {"it": "Guida all'installazione", "en": "Install guide"},
 }

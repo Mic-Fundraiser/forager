@@ -19,8 +19,15 @@ GUIDE = [
             {
                 "q": {"it": "Cosa serve per usare Forager", "en": "What you need to run Forager"},
                 "a": {
-                    "it": "Forager funziona out-of-the-box per anagrafica, pipeline, donazioni e task. Le funzioni <b>AI</b> (ricerca, email, chat) richiedono <b>Claude Code CLI</b> installato e autenticato sul computer: se manca vedi un banner giallo in alto. <b>Hunter.io</b> è opzionale e serve solo per trovare indirizzi email.",
-                    "en": "Forager works out-of-the-box for records, pipeline, gifts and tasks. <b>AI</b> features (research, email, chat) require <b>Claude Code CLI</b> installed and authenticated on your computer: a yellow banner appears at the top if it's missing. <b>Hunter.io</b> is optional and only needed to find email addresses.",
+                    "it": "Forager funziona out-of-the-box per anagrafica, pipeline, donazioni e task. Le funzioni <b>AI</b> (ricerca, email, chat) richiedono un CLI agentico installato e autenticato sul computer: <b>Claude Code</b> (Anthropic, consigliato) oppure <b>Codex CLI</b> (OpenAI). Se il motore scelto manca vedi un banner giallo in alto. <b>Hunter.io</b> è opzionale e serve solo per trovare indirizzi email.",
+                    "en": "Forager works out-of-the-box for records, pipeline, gifts and tasks. <b>AI</b> features (research, email, chat) require an agent CLI installed and authenticated on your computer: <b>Claude Code</b> (Anthropic, recommended) or <b>Codex CLI</b> (OpenAI). A yellow banner appears at the top if the selected engine is missing. <b>Hunter.io</b> is optional and only needed to find email addresses.",
+                },
+            },
+            {
+                "q": {"it": "Scegliere il motore AI: Claude Code o Codex", "en": "Choosing the AI engine: Claude Code or Codex"},
+                "a": {
+                    "it": "Da <b>Settings → Motore AI</b> scegli quale CLI usare: <b>Claude Code</b> (<code>npm install -g @anthropic-ai/claude-code</code>, poi <code>claude</code> per il login) o <b>Codex CLI</b> (<code>npm install -g @openai/codex</code>, poi <code>codex login</code>). Ogni motore usa il rispettivo abbonamento (Claude o ChatGPT): nessuna API key da incollare in Forager. Il cambio è immediato, senza riavvio. Claude Code resta il motore consigliato: è quello con cui Forager è sviluppato e testato.",
+                    "en": "In <b>Settings → AI engine</b> pick which CLI to use: <b>Claude Code</b> (<code>npm install -g @anthropic-ai/claude-code</code>, then <code>claude</code> to log in) or <b>Codex CLI</b> (<code>npm install -g @openai/codex</code>, then <code>codex login</code>). Each engine uses its own subscription (Claude or ChatGPT): no API key to paste into Forager. Switching is instant, no restart needed. Claude Code remains the recommended engine: it's what Forager is built and tested with.",
                 },
             },
             {
@@ -590,8 +597,8 @@ GUIDE = [
             {
                 "q": {"it": "La pagina Usage", "en": "The Usage page"},
                 "a": {
-                    "it": "<b>Usage</b> mostra numero di chiamate, token, costo stimato e durata — totali, ultimi 7/30 giorni, per <b>tipo di operazione</b> (ricerca, compose, chat…) e per <b>prospect</b>. Vedi anche gli errori e la quota Hunter residua.",
-                    "en": "<b>Usage</b> shows call counts, tokens, estimated cost and duration — totals, last 7/30 days, by <b>operation type</b> (research, compose, chat…) and by <b>prospect</b>. You also see errors and the remaining Hunter quota.",
+                    "it": "<b>Usage</b> mostra numero di chiamate, token, costo stimato e durata — totali, ultimi 7/30 giorni, per <b>tipo di operazione</b> (ricerca, compose, chat…) e per <b>prospect</b>. Vedi anche gli errori e la quota Hunter residua. Nota: con il motore <b>Codex</b> il CLI non riporta il costo in dollari — vedi comunque token e durata.",
+                    "en": "<b>Usage</b> shows call counts, tokens, estimated cost and duration — totals, last 7/30 days, by <b>operation type</b> (research, compose, chat…) and by <b>prospect</b>. You also see errors and the remaining Hunter quota. Note: with the <b>Codex</b> engine the CLI doesn't report dollar cost — you still see tokens and duration.",
                 },
             },
             {
