@@ -13,7 +13,7 @@
     <h1 class="text-[24px] font-bold tracking-tight">{{ d.subject or tr('draft.no_subject') }}</h1>
     <p class="text-[13px] text-ink-500 mt-1">
       <span class="font-mono">{{ d.created_at[:16] }}</span> ·
-      <span x-data x-text="`${wordCount} {{ tr('draft.words') }} · ${readMinutes} {{ tr('draft.min_read') }}`" id="liveStats">…</span>
+      <span id="liveStats">…</span>
       {% if d.sent %}<span class="b b-emerald ml-2"><span class="dot"></span>{{ tr('draft.sent') }} {{ d.sent_at[:10] }}</span>{% endif %}
     </p>
   </div>
@@ -303,6 +303,9 @@
   display: grid; place-items: center;
   z-index: 70;
 }
+/* questa regola vive dopo il CSS runtime di Tailwind: senza l'override sotto,
+   `display:grid` vincerebbe su `.hidden` e l'overlay bloccherebbe l'editor */
+.ai-loading.hidden { display: none; }
 .ai-loading-inner {
   display: inline-flex; align-items: center; gap: 12px;
   background: var(--ink-900); color: white;
@@ -384,6 +387,7 @@ function updateStats() {
   document.getElementById('statWords').textContent = words;
   document.getElementById('statChars').textContent = chars;
   document.getElementById('statMin').textContent = min;
+  document.getElementById('liveStats').textContent = `${words} {{ tr('draft.words') }} · ${min} {{ tr('draft.min_read') }}`;
   document.getElementById('prevBody').textContent = text;
   document.getElementById('prevSubject').textContent = subjectInput.value || '{{ tr("draft.no_subject_paren") }}';
   document.getElementById('prevContact').textContent = document.getElementById('contactName').value || '—';
