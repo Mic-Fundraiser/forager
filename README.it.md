@@ -1,5 +1,7 @@
 # Forager
 
+🇬🇧 **[Read in English](README.md)** · 🌐 [forager.michelangelogigli.it](https://forager.michelangelogigli.it) · ⬇️ [Scarica per Mac (.dmg, notarizzato)](https://forager.michelangelogigli.it/downloads/Forager-1.1.0.dmg?v=4)
+
 **Il CRM open source per major donor, aziende e fondazioni.** Non un CRM generico:
 è costruito per chi fa major donor, corporate e foundation fundraising. Tutto in locale,
 niente cloud, niente abbonamenti (eccetto il motore AI, vedi [Costi](#costi)).
